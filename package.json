@@ -1,0 +1,14 @@
+{
+  "name": "brainweb",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "packages/compiler",
+    "packages/runtime"
+  ],
+  "scripts": {
+    "build": "yarn workspaces run build",
+    "test": "yarn workspace @brainweb/compiler test",
+    "compile": "yarn workspace @brainweb/compiler build && node packages/compiler/dist/cli.js"
+  }
+}

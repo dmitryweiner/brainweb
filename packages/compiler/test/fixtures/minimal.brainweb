@@ -1,0 +1,43 @@
+app MinimalTest {
+
+  sensor UI : events(Click)
+
+  encoder Enc {
+    in = [UI.*]
+    out = FeatureVector dim=16
+    policy = {
+      onehot(EventType)
+      hash(TargetCssPath, 8)
+    }
+  }
+
+  region Core {
+    population Ctx : state(slots=2, decay=3s, merge="overwrite")
+  }
+
+  circuit Gate {
+    actions = [DoStuff, Ignore]
+    population AV : rate(units=2)
+    population W : winner_take_all(units=2)
+    projection AV -> W { topology = softmax(temp=1.0) }
+  }
+
+  effector Eff {
+    bind DoStuff -> js("fx.doStuff(ctx)")
+    bind Ignore -> noop
+  }
+
+  runtime {
+    tick = RAF
+    step {
+      ingest [UI]
+      run Enc
+      run Core.Ctx
+      run Gate
+      emit Eff from=Gate.W winner_only
+    }
+    guards {
+      max_effects_per_sec = 5
+    }
+  }
+}

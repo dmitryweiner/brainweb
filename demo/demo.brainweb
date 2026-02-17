@@ -1,0 +1,47 @@
+app ClickDemo {
+
+  sensor UI : events(Click, Input, KeyDown)
+
+  encoder EventEncoder {
+    in = [UI.*]
+    out = FeatureVector dim=32
+    policy = {
+      onehot(EventType)
+      bucket(TimeDelta, 8)
+      hash(TargetCssPath, 16)
+      numeric(InputLen)
+    }
+  }
+
+  region Core {
+    population Context : state(slots=4, decay=5s, merge="overwrite")
+  }
+
+  circuit ActionGate {
+    actions = [ShowToast, HighlightTarget, Ignore]
+    population ActionValues : rate(units=3)
+    population Gate : winner_take_all(units=3)
+    projection ActionValues -> Gate { topology = softmax(temp=1.0) }
+  }
+
+  effector Actions {
+    bind ShowToast -> js("fx.toast(ctx)")
+    bind HighlightTarget -> js("fx.highlight(ctx.target)")
+    bind Ignore -> noop
+  }
+
+  runtime {
+    tick = RAF
+    step {
+      ingest [UI]
+      run EventEncoder
+      run Core.Context
+      run ActionGate
+      emit Actions from=ActionGate.Gate winner_only
+    }
+    guards {
+      max_effects_per_sec = 2
+      suppress_repeats(window=3s)
+    }
+  }
+}

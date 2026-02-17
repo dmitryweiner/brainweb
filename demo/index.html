@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BrainWeb Demo — ClickDemo</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0d1117;
+      color: #c9d1d9;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 40px 20px;
+    }
+
+    h1 {
+      color: #58a6ff;
+      font-size: 28px;
+      margin-bottom: 8px;
+    }
+
+    .subtitle {
+      color: #8b949e;
+      margin-bottom: 32px;
+      font-size: 14px;
+    }
+
+    .card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 20px;
+      transition: border-color 0.3s;
+    }
+
+    .card:hover {
+      border-color: #58a6ff;
+    }
+
+    .card h2 {
+      font-size: 18px;
+      color: #e6edf3;
+      margin: 0 0 12px;
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      padding: 10px 20px;
+      border-radius: 8px;
+      border: 1px solid #30363d;
+      background: #21262d;
+      color: #c9d1d9;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    button:hover {
+      background: #30363d;
+      border-color: #58a6ff;
+      color: #fff;
+    }
+
+    button.primary {
+      background: #238636;
+      border-color: #2ea043;
+      color: #fff;
+    }
+
+    button.primary:hover {
+      background: #2ea043;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      padding: 10px 14px;
+      border-radius: 8px;
+      border: 1px solid #30363d;
+      background: #0d1117;
+      color: #c9d1d9;
+      font-size: 14px;
+      margin-top: 8px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    input[type="text"]:focus {
+      border-color: #58a6ff;
+    }
+
+    .scrollable {
+      height: 200px;
+      overflow-y: auto;
+      background: #0d1117;
+      border-radius: 8px;
+      padding: 16px;
+      border: 1px solid #30363d;
+    }
+
+    .scrollable p {
+      margin: 8px 0;
+      color: #8b949e;
+      font-size: 13px;
+    }
+
+    .toast-container {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 999998;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .toast {
+      background: #238636;
+      color: #fff;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+      animation: toastIn 0.3s ease-out, toastOut 0.3s ease-in 2.7s forwards;
+    }
+
+    @keyframes toastIn {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes toastOut {
+      from { opacity: 1; }
+      to { opacity: 0; transform: translateY(-10px); }
+    }
+
+    .highlight {
+      outline: 3px solid #f0883e !important;
+      outline-offset: 2px;
+      transition: outline-color 0.3s;
+    }
+
+    .controls {
+      display: flex;
+      gap: 8px;
+      margin-top: 20px;
+    }
+
+    #status {
+      font-size: 12px;
+      color: #8b949e;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="toast-container" id="toast-container"></div>
+
+<div class="container">
+  <h1>BrainWeb Demo</h1>
+  <p class="subtitle">
+    A brain-like event-driven app: Sensors capture your clicks, keys, and input.
+    The encoder converts them to features. The action gate picks what to do.
+  </p>
+
+  <div class="card">
+    <h2>Click Targets</h2>
+    <div class="btn-row">
+      <button id="btn-alpha">Alpha</button>
+      <button id="btn-beta">Beta</button>
+      <button id="btn-gamma">Gamma</button>
+      <button class="primary" id="btn-action">Do Something</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Text Input</h2>
+    <input type="text" id="text-input" placeholder="Type something here...">
+  </div>
+
+  <div class="card">
+    <h2>Scrollable Area</h2>
+    <div class="scrollable" id="scroll-area">
+      <p>Scroll inside this box to generate scroll events.</p>
+      <p>The encoder will capture your scroll position.</p>
+      <p>Each interaction feeds the brain graph.</p>
+      <p>The action selector picks: Toast, Highlight, or Ignore.</p>
+      <p>Guards throttle effects to max 2/sec.</p>
+      <p>Repeated actions within 3s are suppressed.</p>
+      <p>Watch the debug overlay (bottom-right) for live state.</p>
+      <p>You can record and replay event logs.</p>
+      <p>---</p>
+      <p>Keep scrolling...</p>
+      <p>More content here.</p>
+      <p>Almost there...</p>
+      <p>End of scroll area.</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Controls</h2>
+    <div class="controls">
+      <button id="btn-record" class="primary">Start Recording</button>
+      <button id="btn-replay">Replay Last</button>
+    </div>
+    <div id="status"></div>
+  </div>
+</div>
+
+<script src="app.runtime.js"></script>
+<script>
+  // Effect functions provided by the host
+  const fx = {
+    toast: function(ctx) {
+      const container = document.getElementById("toast-container");
+      const toast = document.createElement("div");
+      toast.className = "toast";
+      toast.textContent = "Action: " + (ctx.eventType || "event") + " on " + (ctx.target || "page");
+      container.appendChild(toast);
+      setTimeout(function() { toast.remove(); }, 3000);
+    },
+
+    highlight: function(target) {
+      if (!target) return;
+      // Try to find element by CSS path or use body
+      var el;
+      try { el = document.querySelector(target); } catch(e) { el = null; }
+      if (!el) return;
+      el.classList.add("highlight");
+      setTimeout(function() { el.classList.remove("highlight"); }, 1500);
+    }
+  };
+
+  // Create and start the app
+  var app = BrainWeb.createApp(fx, { seed: 42, debug: true });
+  app.start();
+
+  // Recording controls
+  var recording = false;
+  var lastRecording = null;
+
+  document.getElementById("btn-record").addEventListener("click", function(e) {
+    e.stopPropagation();
+    if (!recording) {
+      app.startRecording();
+      recording = true;
+      this.textContent = "Stop Recording";
+      this.style.background = "#da3633";
+      this.style.borderColor = "#f85149";
+      document.getElementById("status").textContent = "Recording...";
+    } else {
+      lastRecording = app.stopRecording();
+      recording = false;
+      this.textContent = "Start Recording";
+      this.style.background = "";
+      this.style.borderColor = "";
+      document.getElementById("status").textContent =
+        "Recorded " + lastRecording.length + " entries. Click Replay to play back.";
+    }
+  });
+
+  document.getElementById("btn-replay").addEventListener("click", function(e) {
+    e.stopPropagation();
+    if (!lastRecording) {
+      document.getElementById("status").textContent = "Nothing recorded yet.";
+      return;
+    }
+    document.getElementById("status").textContent = "Replaying " + lastRecording.length + " entries...";
+    app.replay(lastRecording);
+    document.getElementById("status").textContent = "Replay complete.";
+  });
+</script>
+
+</body>
+</html>

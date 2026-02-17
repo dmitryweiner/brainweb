@@ -1,0 +1,149 @@
+{
+  "name": "ClickDemo",
+  "sensors": [
+    {
+      "name": "UI",
+      "eventTypes": [
+        "Click",
+        "Input",
+        "KeyDown"
+      ]
+    }
+  ],
+  "encoders": [
+    {
+      "name": "EventEncoder",
+      "inputs": [
+        {
+          "sensor": "UI",
+          "event": "*"
+        }
+      ],
+      "dim": 32,
+      "featureOps": [
+        {
+          "kind": "onehot",
+          "field": "EventType"
+        },
+        {
+          "kind": "bucket",
+          "field": "TimeDelta",
+          "bins": 8
+        },
+        {
+          "kind": "hash",
+          "field": "TargetCssPath",
+          "buckets": 16
+        },
+        {
+          "kind": "numeric",
+          "field": "InputLen"
+        }
+      ]
+    }
+  ],
+  "modules": [
+    {
+      "kind": "State",
+      "name": "Core__Context",
+      "slots": 4,
+      "decayMs": 5000,
+      "merge": "overwrite"
+    },
+    {
+      "kind": "Rate",
+      "name": "ActionGate__ActionValues",
+      "units": 3
+    },
+    {
+      "kind": "Rate",
+      "name": "ActionGate__Gate",
+      "units": 3
+    },
+    {
+      "kind": "ActionSelector",
+      "name": "ActionGate",
+      "actions": [
+        "ShowToast",
+        "HighlightTarget",
+        "Ignore"
+      ],
+      "temperature": 1
+    }
+  ],
+  "projections": [
+    {
+      "from": "ActionGate__ActionValues",
+      "to": "ActionGate__Gate",
+      "topology": {
+        "kind": "softmax",
+        "temperature": 1
+      },
+      "init": {
+        "kind": "default"
+      }
+    }
+  ],
+  "effectors": [
+    {
+      "name": "Actions",
+      "bindings": [
+        {
+          "action": "ShowToast",
+          "kind": "js",
+          "expr": "fx.toast(ctx)"
+        },
+        {
+          "action": "HighlightTarget",
+          "kind": "js",
+          "expr": "fx.highlight(ctx.target)"
+        },
+        {
+          "action": "Ignore",
+          "kind": "noop"
+        }
+      ]
+    }
+  ],
+  "runtime": {
+    "tick": {
+      "mode": "RAF"
+    },
+    "steps": [
+      {
+        "kind": "ingest",
+        "sensors": [
+          "UI"
+        ]
+      },
+      {
+        "kind": "run",
+        "module": "EventEncoder"
+      },
+      {
+        "kind": "run",
+        "module": "Core.Context"
+      },
+      {
+        "kind": "run",
+        "module": "ActionGate"
+      },
+      {
+        "kind": "emit",
+        "effector": "Actions",
+        "from": "ActionGate.Gate",
+        "winnerOnly": true
+      }
+    ],
+    "guards": [
+      {
+        "kind": "max_effects_per_sec",
+        "limit": 2
+      },
+      {
+        "kind": "suppress_repeats",
+        "windowMs": 3000
+      }
+    ]
+  }
+}
