@@ -669,9 +669,12 @@ BwRuntimeLoop.prototype._runSteps = function(now) {
 // Debug Overlay
 function BwDebugOverlay(enabled) {
   this.container = null;
+  this._toggleBtn = null;
   this.enabled = enabled;
   this._collapsed = {};
+  this._minimized = false;
   this._lastRenderTime = 0;
+  this._sections = ["events","queue","encoder","context","actions","weights","guards","pipeline"];
   this.state = {
     lastEvents: [], contextTarget: "", contextEventType: "",
     actionValues: [], actionProbs: [], actionNames: [],
@@ -694,11 +697,19 @@ BwDebugOverlay.prototype._create = function() {
     "padding:10px;z-index:999999;border-top-left-radius:8px;" +
     "border-left:1px solid rgba(100,100,255,0.3);" +
     "border-top:1px solid rgba(100,100,255,0.3);" +
-    "backdrop-filter:blur(8px);";
+    "backdrop-filter:blur(8px);transition:opacity 0.2s;";
   var self = this;
   this.container.addEventListener("click", function(e) {
     var el = e.target;
     while (el && el !== self.container) {
+      if (el.dataset && el.dataset.bwClose !== undefined) {
+        self._setMinimized(true);
+        return;
+      }
+      if (el.dataset && el.dataset.bwFoldAll !== undefined) {
+        self._toggleFoldAll();
+        return;
+      }
       if (el.dataset && el.dataset.bwSection) {
         self._collapsed[el.dataset.bwSection] = !self._collapsed[el.dataset.bwSection];
         self._render();
@@ -708,6 +719,36 @@ BwDebugOverlay.prototype._create = function() {
     }
   });
   document.body.appendChild(this.container);
+  this._toggleBtn = document.createElement("div");
+  this._toggleBtn.id = "bw-debug-toggle";
+  this._toggleBtn.style.cssText =
+    "position:fixed;bottom:12px;right:12px;width:36px;height:36px;" +
+    "border-radius:50%;background:rgba(15,15,25,0.9);color:#88f;" +
+    "font-family:'SF Mono',Consolas,monospace;font-size:11px;font-weight:bold;" +
+    "display:none;align-items:center;justify-content:center;cursor:pointer;" +
+    "z-index:999999;border:1px solid rgba(100,100,255,0.4);" +
+    "box-shadow:0 2px 8px rgba(0,0,0,0.4);transition:transform 0.2s;user-select:none;";
+  this._toggleBtn.textContent = "BW";
+  this._toggleBtn.title = "Open BrainWeb Debug";
+  this._toggleBtn.addEventListener("mouseenter", function() { this.style.transform = "scale(1.1)"; });
+  this._toggleBtn.addEventListener("mouseleave", function() { this.style.transform = "scale(1)"; });
+  this._toggleBtn.addEventListener("click", function() { self._setMinimized(false); });
+  document.body.appendChild(this._toggleBtn);
+};
+BwDebugOverlay.prototype._setMinimized = function(v) {
+  this._minimized = v;
+  if (this.container) this.container.style.display = v ? "none" : "block";
+  if (this._toggleBtn) this._toggleBtn.style.display = v ? "flex" : "none";
+};
+BwDebugOverlay.prototype._toggleFoldAll = function() {
+  var allFolded = true;
+  for (var i = 0; i < this._sections.length; i++) {
+    if (!this._collapsed[this._sections[i]]) { allFolded = false; break; }
+  }
+  for (var i = 0; i < this._sections.length; i++) {
+    this._collapsed[this._sections[i]] = !allFolded;
+  }
+  this._render();
 };
 BwDebugOverlay.prototype.update = function(partial) {
   for (var k in partial) { if (partial.hasOwnProperty(k)) this.state[k] = partial[k]; }
@@ -720,7 +761,7 @@ BwDebugOverlay.prototype.update = function(partial) {
 BwDebugOverlay.prototype._secHdr = function(id, label) {
   var c = this._collapsed[id];
   var arrow = c ? "\\u25b6" : "\\u25bc";
-  return '<div data-bw-section="' + id + '" style="color:#888;font-size:10px;cursor:pointer;user-select:none;padding:2px 0">' + arrow + ' ' + label + '</div>';
+  return '<div data-bw-section="' + id + '" style="color:#99a;font-size:10px;font-weight:600;cursor:pointer;user-select:none;padding:4px 6px;margin:2px -6px;border-radius:4px;transition:background 0.15s" onmouseenter="this.style.background=\'rgba(100,100,255,0.1)\'" onmouseleave="this.style.background=\'transparent\'">' + arrow + '  ' + label + '</div>';
 };
 BwDebugOverlay.prototype._heatCell = function(val, mx) {
   var t = mx > 0 ? Math.min(Math.abs(val) / mx, 1) : 0;
@@ -742,13 +783,19 @@ BwDebugOverlay.prototype._render = function() {
   var html = '';
   var ts = s.tickStats || {};
 
-  // Header with stats
+  // Header with stats and controls
   html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">';
   html += '<div style="color:#88f;font-weight:bold">BrainWeb Debug</div>';
-  html += '<div style="font-size:9px">';
+  html += '<div style="display:flex;align-items:center;gap:8px">';
+  html += '<span style="font-size:9px">';
   html += '<span style="color:#8f8">' + (ts.fps || 0).toFixed(0) + ' fps</span> ';
   html += '<span style="color:#88f">' + (ts.eventsPerSec || 0).toFixed(0) + ' ev/s</span> ';
   html += '<span style="color:#f8f">' + (ts.actionsPerSec || 0).toFixed(0) + ' act/s</span>';
+  html += '</span>';
+  var allFolded = true;
+  for (var _fi = 0; _fi < this._sections.length; _fi++) { if (!this._collapsed[this._sections[_fi]]) { allFolded = false; break; } }
+  html += '<span data-bw-fold-all style="cursor:pointer;color:#666;font-size:9px;padding:2px 4px;border-radius:3px;border:1px solid #333;user-select:none" title="' + (allFolded ? 'Unfold all' : 'Fold all') + '">' + (allFolded ? '\\u25bc all' : '\\u25b6 all') + '</span>';
+  html += '<span data-bw-close style="cursor:pointer;color:#666;font-size:14px;line-height:1;padding:0 2px;user-select:none" title="Close debug panel">\\u00d7</span>';
   html += '</div></div>';
 
   // EVENTS with full payload
@@ -957,7 +1004,9 @@ BwDebugOverlay.prototype._render = function() {
 };
 BwDebugOverlay.prototype.destroy = function() {
   if (this.container) this.container.remove();
+  if (this._toggleBtn) this._toggleBtn.remove();
   this.container = null;
+  this._toggleBtn = null;
 };
 
 // Recorder

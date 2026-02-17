@@ -61,9 +61,12 @@ export interface DebugState {
 
 export class DebugOverlay {
   private container: HTMLElement | null = null;
+  private toggleBtn: HTMLElement | null = null;
   private enabled: boolean;
   private collapsed: Record<string, boolean> = {};
+  private minimized = false;
   private lastRenderTime = 0;
+  private readonly sections = ["events","queue","encoder","context","actions","weights","guards","pipeline"];
   private state: DebugState = {
     lastEvents: [],
     contextTarget: "",
@@ -100,11 +103,19 @@ export class DebugOverlay {
       padding: 10px; z-index: 999999; border-top-left-radius: 8px;
       border-left: 1px solid rgba(100,100,255,0.3);
       border-top: 1px solid rgba(100,100,255,0.3);
-      backdrop-filter: blur(8px);
+      backdrop-filter: blur(8px); transition: opacity 0.2s;
     `;
     this.container.addEventListener("click", (e) => {
       let el = e.target as HTMLElement;
       while (el && el !== this.container) {
+        if (el.dataset?.bwClose !== undefined) {
+          this.setMinimized(true);
+          return;
+        }
+        if (el.dataset?.bwFoldAll !== undefined) {
+          this.toggleFoldAll();
+          return;
+        }
         if (el.dataset?.bwSection) {
           this.collapsed[el.dataset.bwSection] = !this.collapsed[el.dataset.bwSection];
           this.render();
@@ -114,6 +125,38 @@ export class DebugOverlay {
       }
     });
     document.body.appendChild(this.container);
+
+    // Toggle button (shown when overlay is closed)
+    this.toggleBtn = document.createElement("div");
+    this.toggleBtn.id = "bw-debug-toggle";
+    this.toggleBtn.style.cssText = `
+      position: fixed; bottom: 12px; right: 12px; width: 36px; height: 36px;
+      border-radius: 50%; background: rgba(15,15,25,0.9); color: #88f;
+      font-family: 'SF Mono', Consolas, monospace; font-size: 11px; font-weight: bold;
+      display: none; align-items: center; justify-content: center; cursor: pointer;
+      z-index: 999999; border: 1px solid rgba(100,100,255,0.4);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.4); transition: transform 0.2s; user-select: none;
+    `;
+    this.toggleBtn.textContent = "BW";
+    this.toggleBtn.title = "Open BrainWeb Debug";
+    this.toggleBtn.addEventListener("mouseenter", function(this: HTMLElement) { this.style.transform = "scale(1.1)"; });
+    this.toggleBtn.addEventListener("mouseleave", function(this: HTMLElement) { this.style.transform = "scale(1)"; });
+    this.toggleBtn.addEventListener("click", () => { this.setMinimized(false); });
+    document.body.appendChild(this.toggleBtn);
+  }
+
+  private setMinimized(v: boolean): void {
+    this.minimized = v;
+    if (this.container) this.container.style.display = v ? "none" : "block";
+    if (this.toggleBtn) this.toggleBtn.style.display = v ? "flex" : "none";
+  }
+
+  private toggleFoldAll(): void {
+    const allFolded = this.sections.every(s => this.collapsed[s]);
+    for (const s of this.sections) {
+      this.collapsed[s] = !allFolded;
+    }
+    this.render();
   }
 
   update(state: Partial<DebugState>): void {
@@ -127,7 +170,7 @@ export class DebugOverlay {
 
   private secHdr(id: string, label: string): string {
     const arrow = this.collapsed[id] ? "\u25b6" : "\u25bc";
-    return `<div data-bw-section="${id}" style="color:#888;font-size:10px;cursor:pointer;user-select:none;padding:2px 0">${arrow} ${label}</div>`;
+    return `<div data-bw-section="${id}" style="color:#99a;font-size:10px;font-weight:600;cursor:pointer;user-select:none;padding:4px 6px;margin:2px -6px;border-radius:4px;transition:background 0.15s" onmouseenter="this.style.background='rgba(100,100,255,0.1)'" onmouseleave="this.style.background='transparent'">${arrow}  ${label}</div>`;
   }
 
   private heatCell(val: number, mx: number): string {
@@ -152,13 +195,18 @@ export class DebugOverlay {
     let html = '';
     const ts = s.tickStats;
 
-    // Header with stats
+    // Header with stats and controls
     html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">';
     html += '<div style="color:#88f;font-weight:bold">BrainWeb Debug</div>';
-    html += '<div style="font-size:9px">';
+    html += '<div style="display:flex;align-items:center;gap:8px">';
+    html += '<span style="font-size:9px">';
     html += `<span style="color:#8f8">${ts.fps.toFixed(0)} fps</span> `;
     html += `<span style="color:#88f">${ts.eventsPerSec.toFixed(0)} ev/s</span> `;
     html += `<span style="color:#f8f">${ts.actionsPerSec.toFixed(0)} act/s</span>`;
+    html += '</span>';
+    const allFolded = this.sections.every(s => this.collapsed[s]);
+    html += `<span data-bw-fold-all style="cursor:pointer;color:#666;font-size:9px;padding:2px 4px;border-radius:3px;border:1px solid #333;user-select:none" title="${allFolded ? 'Unfold all' : 'Fold all'}">${allFolded ? '\u25bc all' : '\u25b6 all'}</span>`;
+    html += '<span data-bw-close style="cursor:pointer;color:#666;font-size:14px;line-height:1;padding:0 2px;user-select:none" title="Close debug panel">\u00d7</span>';
     html += '</div></div>';
 
     // EVENTS with full payload
@@ -345,7 +393,9 @@ export class DebugOverlay {
 
   destroy(): void {
     this.container?.remove();
+    this.toggleBtn?.remove();
     this.container = null;
+    this.toggleBtn = null;
   }
 }
 
