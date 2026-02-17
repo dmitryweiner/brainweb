@@ -50,6 +50,7 @@ BwEventQueue.prototype.drain = function() {
   if (this.buf.length === 0) return [];
   var events = this.buf; this.buf = []; return events;
 };
+BwEventQueue.prototype.getLength = function() { return this.buf.length; };
 
 // Sensor Wiring
 function bwCssPath(el) {
@@ -177,6 +178,23 @@ BwEncoder.prototype.encode = function(events, now) {
   this.lastEventTime = now;
   return this.output;
 };
+BwEncoder.prototype.getOpRanges = function() {
+  var ranges = [];
+  var offset = 0;
+  for (var i = 0; i < this.ops.length; i++) {
+    var op = this.ops[i];
+    var len = 0;
+    switch (op.kind) {
+      case "onehot": len = Math.min(this.eventTypeList.length, this.dim - offset); break;
+      case "bucket": len = op.bins || 16; break;
+      case "hash": len = op.buckets || 32; break;
+      case "numeric": case "clamp": case "scale": len = 1; break;
+    }
+    ranges.push({ kind: op.kind, field: op.field || "", offset: offset, len: len });
+    offset += len;
+  }
+  return ranges;
+};
 
 // Context Memory
 function BwContextMemory(config) {
@@ -227,6 +245,27 @@ BwContextMemory.prototype.step = function(features, meta, now) {
     if (this.slotTimes[i] > latestTime) { latestTime = this.slotTimes[i]; latestMeta = this.slotMeta[i]; }
   }
   return { target: latestMeta.target || "", eventType: latestMeta.eventType || "", features: aggregated };
+};
+BwContextMemory.prototype.getSlotInfo = function(now) {
+  var info = [];
+  for (var i = 0; i < this.slots; i++) {
+    var age = now - this.slotTimes[i];
+    var w = this.slotTimes[i] > 0 ? Math.exp(-age / this.decayMs) : 0;
+    var energy = 0;
+    var d = this.slotData[i];
+    for (var j = 0; j < this.featureDim; j++) energy += d[j] * d[j];
+    energy = Math.sqrt(energy);
+    info.push({
+      index: i,
+      active: this.slotTimes[i] > 0,
+      age: age,
+      decayWeight: w,
+      energy: energy,
+      target: (this.slotMeta[i] && this.slotMeta[i].target) || "",
+      eventType: (this.slotMeta[i] && this.slotMeta[i].eventType) || ""
+    });
+  }
+  return info;
 };
 
 // Action Selector
@@ -312,6 +351,7 @@ BwGuardChain.prototype.record = function(action, now) {
   var cutoff = now - 5000;
   while (this.recentEffects.length > 0 && this.recentEffects[0].t < cutoff) this.recentEffects.shift();
 };
+BwGuardChain.prototype.getRecentEffects = function() { return this.recentEffects.slice(); };
 
 // Runtime Loop
 function BwRuntimeLoop(config) {
@@ -358,10 +398,17 @@ BwRuntimeLoop.prototype._runSteps = function(now) {
 function BwDebugOverlay(enabled) {
   this.container = null;
   this.enabled = enabled;
+  this._collapsed = {};
+  this._lastRenderTime = 0;
   this.state = {
     lastEvents: [], contextTarget: "", contextEventType: "",
     actionValues: [], actionProbs: [], actionNames: [],
-    winner: "", guardRejection: null
+    winner: "", guardRejection: null,
+    featureVector: null, encoderOps: [],
+    contextSlots: [], guardHistory: [],
+    eventQueueLen: 0, pipelineSteps: [],
+    tickStats: { fps: 0, eventsPerSec: 0, actionsPerSec: 0, tickMs: 0 },
+    weightMatrix: null
   };
   if (enabled && typeof document !== "undefined") this._create();
 }
@@ -369,49 +416,272 @@ BwDebugOverlay.prototype._create = function() {
   this.container = document.createElement("div");
   this.container.id = "bw-debug-overlay";
   this.container.style.cssText =
-    "position:fixed;bottom:0;right:0;width:360px;max-height:50vh;" +
-    "overflow-y:auto;background:rgba(15,15,25,0.92);color:#e0e0e0;" +
+    "position:fixed;bottom:0;right:0;width:380px;max-height:60vh;" +
+    "overflow-y:auto;background:rgba(15,15,25,0.95);color:#e0e0e0;" +
     "font-family:'SF Mono',Consolas,monospace;font-size:11px;" +
     "padding:10px;z-index:999999;border-top-left-radius:8px;" +
     "border-left:1px solid rgba(100,100,255,0.3);" +
     "border-top:1px solid rgba(100,100,255,0.3);" +
     "backdrop-filter:blur(8px);";
+  var self = this;
+  this.container.addEventListener("click", function(e) {
+    var el = e.target;
+    while (el && el !== self.container) {
+      if (el.dataset && el.dataset.bwSection) {
+        self._collapsed[el.dataset.bwSection] = !self._collapsed[el.dataset.bwSection];
+        self._render();
+        return;
+      }
+      el = el.parentElement;
+    }
+  });
   document.body.appendChild(this.container);
 };
 BwDebugOverlay.prototype.update = function(partial) {
   for (var k in partial) { if (partial.hasOwnProperty(k)) this.state[k] = partial[k]; }
   if (!this.enabled || !this.container) return;
+  var now = performance.now();
+  if (now - this._lastRenderTime < 100) return;
+  this._lastRenderTime = now;
   this._render();
+};
+BwDebugOverlay.prototype._secHdr = function(id, label) {
+  var c = this._collapsed[id];
+  var arrow = c ? "\u25b6" : "\u25bc";
+  return '<div data-bw-section="' + id + '" style="color:#888;font-size:10px;cursor:pointer;user-select:none;padding:2px 0">' + arrow + ' ' + label + '</div>';
+};
+BwDebugOverlay.prototype._heatCell = function(val, mx) {
+  var t = mx > 0 ? Math.min(Math.abs(val) / mx, 1) : 0;
+  var r = Math.round(20 + t * 60);
+  var g = Math.round(20 + t * 100);
+  var b = Math.round(40 + t * 215);
+  return '<span style="display:inline-block;width:4px;height:10px;background:rgb(' + r + ',' + g + ',' + b + ')" title="' + val.toFixed(4) + '"></span>';
+};
+BwDebugOverlay.prototype._weightCell = function(val) {
+  var t = Math.min(Math.abs(val) * 20, 1);
+  var r, g, b;
+  if (val < 0) { r = Math.round(40 + t * 200); g = Math.round(30 + t * 30); b = Math.round(30 + t * 30); }
+  else { r = Math.round(30 + t * 30); g = Math.round(30 + t * 30); b = Math.round(40 + t * 200); }
+  return '<span style="display:inline-block;width:4px;height:4px;background:rgb(' + r + ',' + g + ',' + b + ')" title="' + val.toFixed(5) + '"></span>';
 };
 BwDebugOverlay.prototype._render = function() {
   if (!this.container) return;
   var s = this.state;
-  var evHtml = s.lastEvents.slice(-5).map(function(e) {
-    return '<div style="padding:1px 0;color:#8cf">' + e.sensor + '.' + e.type +
-      ' <span style="color:#666">' + (e.payload && e.payload.target || "") + '</span></div>';
-  }).join("");
-  var actHtml = s.actionNames.map(function(name, i) {
-    var isW = name === s.winner;
-    var bar = "";
-    for (var b = 0; b < Math.round((s.actionProbs[i] || 0) * 20); b++) bar += "\u2588";
-    var st = isW ? "color:#5f5;font-weight:bold" : "color:#aaa";
-    return '<div style="' + st + '">' + (isW ? "\u25b8" : " ") + " " + name + ": " +
-      (s.actionProbs[i] || 0).toFixed(3) + " " + bar + "</div>";
-  }).join("");
-  var gHtml = s.guardRejection
-    ? '<div style="color:#f88;padding:2px 0">\u2298 ' + s.guardRejection + '</div>' : "";
-  this.container.innerHTML =
-    '<div style="color:#88f;font-weight:bold;margin-bottom:4px">BrainWeb Debug</div>' +
-    '<div style="margin-bottom:6px"><div style="color:#888;font-size:10px">EVENTS</div>' +
-    (evHtml || '<div style="color:#555">none</div>') + '</div>' +
-    '<div style="margin-bottom:6px"><div style="color:#888;font-size:10px">CONTEXT</div>' +
-    '<div>target: <span style="color:#cf8">' + (s.contextTarget || "\u2014") + '</span></div>' +
-    '<div>event: <span style="color:#cf8">' + (s.contextEventType || "\u2014") + '</span></div></div>' +
-    '<div style="margin-bottom:6px"><div style="color:#888;font-size:10px">ACTIONS</div>' +
-    (actHtml || '<div style="color:#555">none</div>') + '</div>' +
-    gHtml +
-    '<div style="margin-top:4px;color:#888;font-size:10px">Winner: <span style="color:#5f5;font-weight:bold">' +
+  var html = '';
+  var ts = s.tickStats || {};
+
+  // Header with stats
+  html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">';
+  html += '<div style="color:#88f;font-weight:bold">BrainWeb Debug</div>';
+  html += '<div style="font-size:9px">';
+  html += '<span style="color:#8f8">' + (ts.fps || 0).toFixed(0) + ' fps</span> ';
+  html += '<span style="color:#88f">' + (ts.eventsPerSec || 0).toFixed(0) + ' ev/s</span> ';
+  html += '<span style="color:#f8f">' + (ts.actionsPerSec || 0).toFixed(0) + ' act/s</span>';
+  html += '</div></div>';
+
+  // EVENTS with full payload
+  html += this._secHdr("events", "EVENTS");
+  if (!this._collapsed["events"]) {
+    if (s.lastEvents.length === 0) {
+      html += '<div style="color:#555;margin-bottom:6px">none</div>';
+    } else {
+      html += '<div style="margin-bottom:6px">';
+      var evs = s.lastEvents.slice(-5);
+      for (var ei = 0; ei < evs.length; ei++) {
+        var ev = evs[ei];
+        html += '<div style="padding:1px 0;color:#8cf">' + ev.sensor + '.' + ev.type;
+        if (ev.payload) {
+          var parts = [];
+          for (var pk in ev.payload) {
+            if (ev.payload.hasOwnProperty(pk)) {
+              var pv = ev.payload[pk];
+              if (typeof pv === "number") pv = Math.round(pv * 100) / 100;
+              parts.push('<span style="color:#666">' + pk + '=</span><span style="color:#aaa">' + pv + '</span>');
+            }
+          }
+          if (parts.length > 0) html += ' <span style="font-size:9px">' + parts.join(" ") + '</span>';
+        }
+        html += '</div>';
+      }
+      html += '</div>';
+    }
+  }
+
+  // EVENT QUEUE
+  html += this._secHdr("queue", "EVENT QUEUE");
+  if (!this._collapsed["queue"]) {
+    var ql = s.eventQueueLen || 0;
+    var qbar = "";
+    for (var qi = 0; qi < Math.min(ql, 30); qi++) qbar += "\u2588";
+    html += '<div style="margin-bottom:6px;color:' + (ql > 0 ? "#ff8" : "#555") + '">';
+    html += 'pending: ' + ql + ' ' + qbar + '</div>';
+  }
+
+  // ENCODER feature vector heatmap + ops
+  html += this._secHdr("encoder", "ENCODER");
+  if (!this._collapsed["encoder"]) {
+    html += '<div style="margin-bottom:6px">';
+    if (s.featureVector && s.featureVector.length > 0) {
+      var fv = s.featureVector;
+      var fvMax = 0;
+      for (var fi = 0; fi < fv.length; fi++) { if (Math.abs(fv[fi]) > fvMax) fvMax = Math.abs(fv[fi]); }
+      html += '<div style="font-size:9px;color:#888;margin-bottom:2px">features [' + fv.length + 'd] max=' + fvMax.toFixed(3) + '</div>';
+      html += '<div style="line-height:10px;letter-spacing:0">';
+      for (var fi = 0; fi < fv.length; fi++) {
+        html += this._heatCell(fv[fi], fvMax);
+      }
+      html += '</div>';
+      if (s.encoderOps && s.encoderOps.length > 0) {
+        var opCols = ["#68f", "#f86", "#8f6", "#f6f", "#ff6", "#6ff"];
+        html += '<div style="margin-top:3px;font-size:9px">';
+        for (var oi = 0; oi < s.encoderOps.length; oi++) {
+          var op = s.encoderOps[oi];
+          var oc = opCols[oi % opCols.length];
+          html += '<span style="color:' + oc + '">[' + op.offset + '-' + (op.offset + op.len - 1) + '] ' + op.kind;
+          if (op.field) html += '(' + op.field + ')';
+          html += '</span> ';
+        }
+        html += '</div>';
+      }
+    } else {
+      html += '<div style="color:#555">no features</div>';
+    }
+    html += '</div>';
+  }
+
+  // CONTEXT MEMORY
+  html += this._secHdr("context", "CONTEXT MEMORY");
+  if (!this._collapsed["context"]) {
+    html += '<div style="margin-bottom:6px">';
+    html += '<div>target: <span style="color:#cf8">' + (s.contextTarget || "\u2014") + '</span></div>';
+    html += '<div>event: <span style="color:#cf8">' + (s.contextEventType || "\u2014") + '</span></div>';
+    if (s.contextSlots && s.contextSlots.length > 0) {
+      html += '<div style="margin-top:3px;font-size:9px;color:#888">slots:</div>';
+      for (var ci = 0; ci < s.contextSlots.length; ci++) {
+        var cs = s.contextSlots[ci];
+        if (!cs.active) {
+          html += '<div style="color:#444;font-size:9px">[' + cs.index + '] empty</div>';
+        } else {
+          var ageStr = cs.age < 1000 ? Math.round(cs.age) + 'ms' : (cs.age / 1000).toFixed(1) + 's';
+          var wBar = "";
+          var wLen = Math.round(cs.decayWeight * 10);
+          for (var wi = 0; wi < wLen; wi++) wBar += "\u2588";
+          html += '<div style="font-size:9px">';
+          html += '<span style="color:#68f">[' + cs.index + ']</span> ';
+          html += '<span style="color:#aaa">age=' + ageStr + '</span> ';
+          html += '<span style="color:#8f8">w=' + cs.decayWeight.toFixed(2) + ' ' + wBar + '</span> ';
+          html += '<span style="color:#888">E=' + cs.energy.toFixed(3) + '</span> ';
+          if (cs.target) html += '<span style="color:#666">' + cs.target.substring(0, 20) + '</span>';
+          html += '</div>';
+        }
+      }
+    }
+    html += '</div>';
+  }
+
+  // ACTIONS with raw values
+  html += this._secHdr("actions", "ACTIONS");
+  if (!this._collapsed["actions"]) {
+    html += '<div style="margin-bottom:6px">';
+    if (s.actionNames.length === 0) {
+      html += '<div style="color:#555">none</div>';
+    } else {
+      for (var ai = 0; ai < s.actionNames.length; ai++) {
+        var aName = s.actionNames[ai];
+        var isW = aName === s.winner;
+        var prob = s.actionProbs[ai] || 0;
+        var rawV = s.actionValues[ai] !== undefined ? s.actionValues[ai] : 0;
+        var bar = "";
+        for (var ab = 0; ab < Math.round(prob * 20); ab++) bar += "\u2588";
+        var st = isW ? "color:#5f5;font-weight:bold" : "color:#aaa";
+        html += '<div style="' + st + '">' + (isW ? "\u25b8" : " ") + " " + aName + ": ";
+        html += prob.toFixed(3) + " " + bar;
+        html += ' <span style="color:#666;font-size:9px">raw=' + rawV.toFixed(4) + '</span>';
+        html += '</div>';
+      }
+    }
+    html += '</div>';
+  }
+
+  // WEIGHT MATRIX
+  html += this._secHdr("weights", "WEIGHT MATRIX");
+  if (!this._collapsed["weights"]) {
+    html += '<div style="margin-bottom:6px">';
+    if (s.weightMatrix && s.weightMatrix.weights) {
+      var wm = s.weightMatrix;
+      var dim = wm.featureDim;
+      var acts = wm.actions;
+      html += '<div style="font-size:9px;color:#888;margin-bottom:2px">' + acts.length + ' actions \u00d7 ' + dim + ' features</div>';
+      for (var wa = 0; wa < acts.length; wa++) {
+        html += '<div style="line-height:5px;margin-bottom:1px">';
+        html += '<span style="font-size:8px;color:#888;display:inline-block;width:50px;overflow:hidden;text-overflow:ellipsis;vertical-align:top">' + acts[wa].substring(0, 7) + '</span>';
+        var base = wa * dim;
+        for (var wf = 0; wf < dim; wf++) {
+          html += this._weightCell(wm.weights[base + wf]);
+        }
+        html += '</div>';
+      }
+    } else {
+      html += '<div style="color:#555">no weights</div>';
+    }
+    html += '</div>';
+  }
+
+  // GUARDS
+  html += this._secHdr("guards", "GUARDS");
+  if (!this._collapsed["guards"]) {
+    html += '<div style="margin-bottom:6px">';
+    if (s.guardRejection) {
+      html += '<div style="color:#f88;padding:2px 0">\u2298 ' + s.guardRejection + '</div>';
+    }
+    if (s.guardHistory && s.guardHistory.length > 0) {
+      html += '<div style="font-size:9px;color:#888;margin-top:2px">recent effects:</div>';
+      var gh = s.guardHistory.slice(-8);
+      var ghNow = performance.now();
+      for (var gi = 0; gi < gh.length; gi++) {
+        var ge = gh[gi];
+        var gAge = ghNow - ge.t;
+        var gAgeStr = gAge < 1000 ? Math.round(gAge) + 'ms' : (gAge / 1000).toFixed(1) + 's';
+        html += '<div style="font-size:9px"><span style="color:#f86">' + ge.action + '</span> <span style="color:#666">' + gAgeStr + ' ago</span></div>';
+      }
+    } else if (!s.guardRejection) {
+      html += '<div style="color:#555">no recent effects</div>';
+    }
+    html += '</div>';
+  }
+
+  // PIPELINE
+  html += this._secHdr("pipeline", "PIPELINE");
+  if (!this._collapsed["pipeline"]) {
+    html += '<div style="margin-bottom:6px">';
+    if (s.pipelineSteps && s.pipelineSteps.length > 0) {
+      var maxDur = 0;
+      for (var pi = 0; pi < s.pipelineSteps.length; pi++) {
+        if (s.pipelineSteps[pi].durationMs > maxDur) maxDur = s.pipelineSteps[pi].durationMs;
+      }
+      for (var pi = 0; pi < s.pipelineSteps.length; pi++) {
+        var ps = s.pipelineSteps[pi];
+        var pbar = "";
+        var pLen = maxDur > 0 ? Math.round((ps.durationMs / maxDur) * 15) : 0;
+        for (var pb = 0; pb < pLen; pb++) pbar += "\u2588";
+        html += '<div style="font-size:9px">';
+        html += '<span style="color:#68f;display:inline-block;width:55px">' + ps.name + '</span>';
+        html += '<span style="color:#aaa">' + ps.durationMs.toFixed(2) + 'ms</span> ';
+        html += '<span style="color:#446">' + pbar + '</span>';
+        html += '</div>';
+      }
+      html += '<div style="font-size:9px;color:#888;margin-top:1px">tick: ' + (ts.tickMs || 0).toFixed(2) + 'ms</div>';
+    } else {
+      html += '<div style="color:#555">no data</div>';
+    }
+    html += '</div>';
+  }
+
+  // Winner
+  html += '<div style="margin-top:4px;color:#888;font-size:10px">Winner: <span style="color:#5f5;font-weight:bold">' +
     (s.winner || "\u2014") + '</span></div>';
+
+  this.container.innerHTML = html;
 };
 BwDebugOverlay.prototype.destroy = function() {
   if (this.container) this.container.remove();
@@ -613,34 +883,71 @@ function createApp(fx, opts) {
   let currentCtx = { target: "", eventType: "", features: new Float32Array(16) };
   let lastEvents = [];
 
+  var _bwStats = { ticks: 0, events: 0, actions: 0, lastFpsTime: 0, fps: 0, eventsPerSec: 0, actionsPerSec: 0, _evAcc: 0, _actAcc: 0 };
+  var _bwPT = [];
+
   // Runtime loop
   const loop = new BwRuntimeLoop({"mode":"RAF"});
 
   loop.setSteps([
     // Ingest events
     function ingestStep(now) {
+      var _t0 = performance.now();
+      var _qLen = eventQueue.getLength();
       lastEvents = eventQueue.drain();
+      _bwStats._evAcc += lastEvents.length;
       for (const ev of lastEvents) {
         recorder.recordEvent(ev);
       }
+      if (lastEvents.length > 0) debugOverlay.update({ eventQueueLen: _qLen });
+      _bwPT[0] = { name: "ingest", durationMs: performance.now() - _t0 };
     },
     // Encode
     function encodeStep(now) {
-      if (lastEvents.length === 0) return;
+      var _t0 = performance.now();
+      if (lastEvents.length === 0) { _bwPT[1] = { name: "encode", durationMs: 0 }; return; }
       const features = encoder.encode(lastEvents, now);
       const meta = lastEvents.length > 0 ? lastEvents[lastEvents.length - 1].payload : {};
       meta.eventType = lastEvents.length > 0 ? lastEvents[lastEvents.length - 1].type : "";
       currentCtx = contextMemory.step(features, meta, now);
+      _bwPT[1] = { name: "encode", durationMs: performance.now() - _t0 };
     },
     // Action selection + effect emission
     function actionStep(now) {
-      if (lastEvents.length === 0) return;
+      var _t0 = performance.now();
+      // Update tick stats
+      _bwStats.ticks++;
+      if (now - _bwStats.lastFpsTime >= 500) {
+        var dt = (now - _bwStats.lastFpsTime) / 1000;
+        if (dt > 0) {
+          _bwStats.fps = _bwStats.ticks / dt;
+          _bwStats.eventsPerSec = _bwStats._evAcc / dt;
+          _bwStats.actionsPerSec = _bwStats._actAcc / dt;
+        }
+        _bwStats.ticks = 0;
+        _bwStats._evAcc = 0;
+        _bwStats._actAcc = 0;
+        _bwStats.lastFpsTime = now;
+      }
+      if (lastEvents.length === 0) {
+        _bwPT[2] = { name: "action", durationMs: 0 };
+        debugOverlay.update({
+          tickStats: { fps: _bwStats.fps, eventsPerSec: _bwStats.eventsPerSec, actionsPerSec: _bwStats.actionsPerSec, tickMs: 0 },
+          pipelineSteps: _bwPT.slice()
+        });
+        return;
+      }
       const result = actionSelector.step(currentCtx.features);
       const actions = actionSelector.getActions();
       const winner = actions[result.winner];
 
       // Guard check
       const allowed = guards.check(winner, now);
+      if (allowed) _bwStats._actAcc++;
+
+      _bwPT[2] = { name: "action", durationMs: performance.now() - _t0 };
+      var _totalTick = 0;
+      for (var _ti = 0; _ti < _bwPT.length; _ti++) _totalTick += _bwPT[_ti] ? _bwPT[_ti].durationMs : 0;
 
       // Debug update
       debugOverlay.update({
@@ -652,6 +959,13 @@ function createApp(fx, opts) {
         actionNames: actions,
         winner: winner,
         guardRejection: allowed ? null : guards.lastRejection,
+        featureVector: Array.from(encoder.output),
+        encoderOps: encoder.getOpRanges(),
+        contextSlots: contextMemory.getSlotInfo(now),
+        guardHistory: guards.getRecentEffects(),
+        weightMatrix: { weights: Array.from(actionSelector.weights), actions: actions, featureDim: actionSelector.featureDim },
+        pipelineSteps: _bwPT.slice(),
+        tickStats: { fps: _bwStats.fps, eventsPerSec: _bwStats.eventsPerSec, actionsPerSec: _bwStats.actionsPerSec, tickMs: _totalTick },
       });
 
       // Record
