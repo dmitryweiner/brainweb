@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BrainWeb — Tic-Tac-Toe</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0d1117;
+      color: #c9d1d9;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .game {
+      text-align: center;
+      padding: 40px 20px;
+    }
+
+    h1 {
+      color: #58a6ff;
+      font-size: 32px;
+      margin: 0 0 8px;
+    }
+
+    .subtitle {
+      color: #8b949e;
+      font-size: 14px;
+      margin: 0 0 32px;
+    }
+
+    .scoreboard {
+      display: flex;
+      justify-content: center;
+      gap: 32px;
+      margin-bottom: 28px;
+    }
+
+    .score-item {
+      text-align: center;
+    }
+
+    .score-label {
+      font-size: 12px;
+      color: #8b949e;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 4px;
+    }
+
+    .score-label.you { color: #58a6ff; }
+    .score-label.cpu { color: #f0883e; }
+    .score-label.draw { color: #8b949e; }
+
+    .score-value {
+      font-size: 36px;
+      font-weight: 700;
+      color: #e6edf3;
+    }
+
+    .board {
+      display: grid;
+      grid-template-columns: repeat(3, 110px);
+      grid-template-rows: repeat(3, 110px);
+      gap: 6px;
+      justify-content: center;
+      margin: 0 auto 28px;
+    }
+
+    .cell {
+      width: 110px;
+      height: 110px;
+      border-radius: 12px;
+      border: 2px solid #30363d;
+      background: #161b22;
+      color: #c9d1d9;
+      font-size: 48px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s;
+      user-select: none;
+      -webkit-user-select: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+    }
+
+    .cell:hover:not(.taken):not(.game-over) {
+      border-color: #58a6ff;
+      background: #21262d;
+    }
+
+    .cell.taken, .cell.game-over {
+      cursor: default;
+    }
+
+    .cell.x { color: #58a6ff; }
+    .cell.o { color: #f0883e; }
+
+    .cell.win {
+      background: #1a3a2a;
+      border-color: #3fb950;
+      animation: winPulse 0.6s ease-in-out;
+    }
+
+    .cell.x.win { color: #58a6ff; }
+    .cell.o.win { color: #f0883e; }
+
+    @keyframes winPulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.08); }
+      100% { transform: scale(1); }
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: scale(0.5); }
+      to { opacity: 1; transform: scale(1); }
+    }
+
+    .cell.placed {
+      animation: fadeIn 0.15s ease-out;
+    }
+
+    .status {
+      font-size: 20px;
+      height: 32px;
+      color: #8b949e;
+      margin-bottom: 20px;
+      transition: color 0.2s;
+    }
+
+    .status.win-x { color: #58a6ff; font-weight: 600; }
+    .status.win-o { color: #f0883e; font-weight: 600; }
+    .status.draw { color: #8b949e; font-weight: 600; }
+
+    .new-game-btn {
+      padding: 12px 28px;
+      border-radius: 10px;
+      border: 2px solid #30363d;
+      background: #21262d;
+      color: #c9d1d9;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .new-game-btn:hover {
+      border-color: #58a6ff;
+      background: #30363d;
+      color: #fff;
+    }
+
+    .new-game-btn:active {
+      transform: scale(0.97);
+    }
+
+    .powered-by {
+      margin-top: 40px;
+      font-size: 12px;
+      color: #484f58;
+    }
+
+    .powered-by a {
+      color: #58a6ff;
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+
+<div class="game">
+  <h1>Tic-Tac-Toe</h1>
+  <p class="subtitle">You are X. Beat the computer if you can!</p>
+
+  <div class="scoreboard">
+    <div class="score-item">
+      <div class="score-label you">You (X)</div>
+      <div class="score-value" id="score-x">0</div>
+    </div>
+    <div class="score-item">
+      <div class="score-label draw">Draws</div>
+      <div class="score-value" id="score-draw">0</div>
+    </div>
+    <div class="score-item">
+      <div class="score-label cpu">CPU (O)</div>
+      <div class="score-value" id="score-o">0</div>
+    </div>
+  </div>
+
+  <div class="board" id="board">
+    <div class="cell" id="cell-0"></div>
+    <div class="cell" id="cell-1"></div>
+    <div class="cell" id="cell-2"></div>
+    <div class="cell" id="cell-3"></div>
+    <div class="cell" id="cell-4"></div>
+    <div class="cell" id="cell-5"></div>
+    <div class="cell" id="cell-6"></div>
+    <div class="cell" id="cell-7"></div>
+    <div class="cell" id="cell-8"></div>
+  </div>
+
+  <div class="status" id="status">Your turn!</div>
+
+  <button class="new-game-btn" id="new-game">New Game</button>
+
+  <div class="powered-by">Powered by <a href="#">BrainWeb</a> neuromorphic engine</div>
+</div>
+
+<script src="app.runtime.js"></script>
+<script>
+  // Game state
+  var board = [null, null, null, null, null, null, null, null, null];
+  var gameOver = false;
+  var scores = { x: 0, o: 0, draw: 0 };
+
+  var WIN_LINES = [
+    [0, 1, 2], [3, 4, 5], [6, 7, 8],
+    [0, 3, 6], [1, 4, 7], [2, 5, 8],
+    [0, 4, 8], [2, 4, 6]
+  ];
+
+  function checkWinner(b) {
+    for (var i = 0; i < WIN_LINES.length; i++) {
+      var a = WIN_LINES[i][0], c = WIN_LINES[i][1], d = WIN_LINES[i][2];
+      if (b[a] && b[a] === b[c] && b[a] === b[d]) {
+        return { winner: b[a], line: WIN_LINES[i] };
+      }
+    }
+    return null;
+  }
+
+  function isBoardFull(b) {
+    for (var i = 0; i < 9; i++) { if (!b[i]) return false; }
+    return true;
+  }
+
+  // Minimax AI
+  function minimax(b, isMaximizing) {
+    var result = checkWinner(b);
+    if (result) return result.winner === "o" ? 10 : -10;
+    if (isBoardFull(b)) return 0;
+
+    if (isMaximizing) {
+      var best = -Infinity;
+      for (var i = 0; i < 9; i++) {
+        if (!b[i]) {
+          b[i] = "o";
+          var score = minimax(b, false);
+          b[i] = null;
+          if (score > best) best = score;
+        }
+      }
+      return best;
+    } else {
+      var best = Infinity;
+      for (var i = 0; i < 9; i++) {
+        if (!b[i]) {
+          b[i] = "x";
+          var score = minimax(b, true);
+          b[i] = null;
+          if (score < best) best = score;
+        }
+      }
+      return best;
+    }
+  }
+
+  function cpuMove() {
+    var bestScore = -Infinity;
+    var bestIdx = -1;
+    for (var i = 0; i < 9; i++) {
+      if (!board[i]) {
+        board[i] = "o";
+        var score = minimax(board, false);
+        board[i] = null;
+        if (score > bestScore) {
+          bestScore = score;
+          bestIdx = i;
+        }
+      }
+    }
+    return bestIdx;
+  }
+
+  function renderBoard() {
+    for (var i = 0; i < 9; i++) {
+      var el = document.getElementById("cell-" + i);
+      el.textContent = board[i] ? board[i].toUpperCase() : "";
+      el.className = "cell";
+      if (board[i] === "x") el.classList.add("x", "taken");
+      else if (board[i] === "o") el.classList.add("o", "taken");
+      if (gameOver) el.classList.add("game-over");
+    }
+  }
+
+  function highlightWin(line) {
+    for (var i = 0; i < line.length; i++) {
+      document.getElementById("cell-" + line[i]).classList.add("win");
+    }
+  }
+
+  function updateScores() {
+    document.getElementById("score-x").textContent = scores.x;
+    document.getElementById("score-o").textContent = scores.o;
+    document.getElementById("score-draw").textContent = scores.draw;
+  }
+
+  function setStatus(text, cls) {
+    var el = document.getElementById("status");
+    el.textContent = text;
+    el.className = "status" + (cls ? " " + cls : "");
+  }
+
+  function resetGame() {
+    board = [null, null, null, null, null, null, null, null, null];
+    gameOver = false;
+    renderBoard();
+    setStatus("Your turn!");
+  }
+
+  function placeMark(idx, mark) {
+    board[idx] = mark;
+    var el = document.getElementById("cell-" + idx);
+    el.textContent = mark.toUpperCase();
+    el.className = "cell taken placed " + mark;
+    if (gameOver) el.classList.add("game-over");
+  }
+
+  function handleCellClick(idx) {
+    if (gameOver || board[idx]) return;
+
+    // Human plays X
+    placeMark(idx, "x");
+
+    var result = checkWinner(board);
+    if (result) {
+      gameOver = true;
+      scores.x++;
+      updateScores();
+      highlightWin(result.line);
+      setStatus("You win!", "win-x");
+      renderGameOverState();
+      return;
+    }
+
+    if (isBoardFull(board)) {
+      gameOver = true;
+      scores.draw++;
+      updateScores();
+      setStatus("It's a draw!", "draw");
+      renderGameOverState();
+      return;
+    }
+
+    // CPU plays O after a short delay for natural feel
+    setStatus("Computer thinking...");
+    setTimeout(function() {
+      var cpuIdx = cpuMove();
+      if (cpuIdx >= 0) {
+        placeMark(cpuIdx, "o");
+
+        var result2 = checkWinner(board);
+        if (result2) {
+          gameOver = true;
+          scores.o++;
+          updateScores();
+          highlightWin(result2.line);
+          setStatus("Computer wins!", "win-o");
+          renderGameOverState();
+          return;
+        }
+
+        if (isBoardFull(board)) {
+          gameOver = true;
+          scores.draw++;
+          updateScores();
+          setStatus("It's a draw!", "draw");
+          renderGameOverState();
+          return;
+        }
+      }
+      setStatus("Your turn!");
+    }, 300);
+  }
+
+  function renderGameOverState() {
+    for (var i = 0; i < 9; i++) {
+      document.getElementById("cell-" + i).classList.add("game-over");
+    }
+  }
+
+  // New game button (direct listener, bypasses BrainWeb pipeline)
+  document.getElementById("new-game").addEventListener("click", function(e) {
+    e.stopPropagation();
+    resetGame();
+  });
+
+  // BrainWeb fx object
+  var fx = {
+    handleMove: function(ctx) {
+      if (gameOver) return;
+
+      var target = ctx.target || "";
+      var idx = -1;
+      for (var i = 0; i < 9; i++) {
+        if (target.indexOf("cell-" + i) !== -1) {
+          idx = i;
+          break;
+        }
+      }
+
+      if (idx < 0) return;
+      handleCellClick(idx);
+    }
+  };
+
+  var app = BrainWeb.createApp(fx, { seed: 42, debug: false });
+  app.start();
+</script>
+
+</body>
+</html>

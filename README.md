@@ -60,11 +60,10 @@ brainweb/
         modules/
           contextMemory.ts   # Stateful context with decay
           actionSelector.ts  # Linear scoring + softmax + argmax
-  demo/
-    demo.brainweb       # Example program
-    index.html          # Host page with fx implementations
-    app.runtime.js      # Generated output (do not edit)
-    app.graph.json      # Generated IR dump
+  demos/
+    click-demo/          # Basic click/input/scroll demo
+    guess-game/          # Guess-the-button game
+    tictactoe/           # Tic-tac-toe (human vs AI)
 ```
 
 ## Quick Start
@@ -89,24 +88,32 @@ yarn build
 ### Compile a `.brainweb` program
 
 ```bash
-node packages/compiler/dist/cli.js demo/demo.brainweb --out demo/
+node packages/compiler/dist/cli.js demos/click-demo/demo.brainweb --out demos/click-demo/
 ```
 
 Or use the convenience script:
 
 ```bash
-yarn compile demo/demo.brainweb --out demo/
+yarn compile demos/click-demo/demo.brainweb --out demos/click-demo/
 ```
 
-### Run the demo
+### Run a demo
 
-Serve the `demo/` directory with any HTTP server:
+Serve any demo directory with an HTTP server:
 
 ```bash
-cd demo && npx serve .
+cd demos/click-demo && npx serve .
 ```
 
 Open http://localhost:3000 in your browser. Click buttons, type text, and scroll -- the debug overlay in the bottom-right corner shows live event ingestion, context state, action probabilities, and the chosen winner.
+
+### Available demos
+
+| Demo | Description |
+|---|---|
+| `demos/click-demo/` | Basic click, input, and scroll event handling with toast and highlight effects |
+| `demos/guess-game/` | Guess-the-button game |
+| `demos/tictactoe/` | Tic-tac-toe: human (X) vs unbeatable minimax AI (O) |
 
 ### Run tests
 
