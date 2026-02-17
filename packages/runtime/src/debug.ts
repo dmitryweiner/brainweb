@@ -124,6 +124,9 @@ export class DebugOverlay {
         el = el.parentElement as HTMLElement;
       }
     });
+    const style = document.createElement("style");
+    style.textContent = ".bw-sec-hdr{color:#99a;font-size:10px;font-weight:600;cursor:pointer;user-select:none;padding:4px 6px;margin:2px -6px;border-radius:4px}.bw-sec-hdr:hover{background:rgba(100,100,255,0.12)}";
+    this.container.appendChild(style);
     document.body.appendChild(this.container);
 
     // Toggle button (shown when overlay is closed)
@@ -137,12 +140,13 @@ export class DebugOverlay {
       z-index: 999999; border: 1px solid rgba(100,100,255,0.4);
       box-shadow: 0 2px 8px rgba(0,0,0,0.4); transition: transform 0.2s; user-select: none;
     `;
-    this.toggleBtn.textContent = "BW";
+    this.toggleBtn.textContent = "\u2699\uFE0F";
     this.toggleBtn.title = "Open BrainWeb Debug";
     this.toggleBtn.addEventListener("mouseenter", function(this: HTMLElement) { this.style.transform = "scale(1.1)"; });
     this.toggleBtn.addEventListener("mouseleave", function(this: HTMLElement) { this.style.transform = "scale(1)"; });
     this.toggleBtn.addEventListener("click", () => { this.setMinimized(false); });
     document.body.appendChild(this.toggleBtn);
+    if (this.minimized) this.setMinimized(true);
   }
 
   private setMinimized(v: boolean): void {
@@ -170,7 +174,7 @@ export class DebugOverlay {
 
   private secHdr(id: string, label: string): string {
     const arrow = this.collapsed[id] ? "\u25b6" : "\u25bc";
-    return `<div data-bw-section="${id}" style="color:#99a;font-size:10px;font-weight:600;cursor:pointer;user-select:none;padding:4px 6px;margin:2px -6px;border-radius:4px;transition:background 0.15s" onmouseenter="this.style.background='rgba(100,100,255,0.1)'" onmouseleave="this.style.background='transparent'">${arrow}  ${label}</div>`;
+    return `<div data-bw-section="${id}" class="bw-sec-hdr">${arrow}  ${label}</div>`;
   }
 
   private heatCell(val: number, mx: number): string {

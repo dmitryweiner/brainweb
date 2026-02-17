@@ -446,6 +446,9 @@ BwDebugOverlay.prototype._create = function() {
       el = el.parentElement;
     }
   });
+  var style = document.createElement("style");
+  style.textContent = ".bw-sec-hdr{color:#99a;font-size:10px;font-weight:600;cursor:pointer;user-select:none;padding:4px 6px;margin:2px -6px;border-radius:4px}.bw-sec-hdr:hover{background:rgba(100,100,255,0.12)}";
+  this.container.appendChild(style);
   document.body.appendChild(this.container);
   this._toggleBtn = document.createElement("div");
   this._toggleBtn.id = "bw-debug-toggle";
@@ -456,12 +459,13 @@ BwDebugOverlay.prototype._create = function() {
     "display:none;align-items:center;justify-content:center;cursor:pointer;" +
     "z-index:999999;border:1px solid rgba(100,100,255,0.4);" +
     "box-shadow:0 2px 8px rgba(0,0,0,0.4);transition:transform 0.2s;user-select:none;";
-  this._toggleBtn.textContent = "BW";
+  this._toggleBtn.textContent = "\u2699\uFE0F";
   this._toggleBtn.title = "Open BrainWeb Debug";
   this._toggleBtn.addEventListener("mouseenter", function() { this.style.transform = "scale(1.1)"; });
   this._toggleBtn.addEventListener("mouseleave", function() { this.style.transform = "scale(1)"; });
   this._toggleBtn.addEventListener("click", function() { self._setMinimized(false); });
   document.body.appendChild(this._toggleBtn);
+  if (this._minimized) this._setMinimized(true);
 };
 BwDebugOverlay.prototype._setMinimized = function(v) {
   this._minimized = v;
@@ -489,7 +493,7 @@ BwDebugOverlay.prototype.update = function(partial) {
 BwDebugOverlay.prototype._secHdr = function(id, label) {
   var c = this._collapsed[id];
   var arrow = c ? "\u25b6" : "\u25bc";
-  return '<div data-bw-section="' + id + '" style="color:#99a;font-size:10px;font-weight:600;cursor:pointer;user-select:none;padding:4px 6px;margin:2px -6px;border-radius:4px;transition:background 0.15s" onmouseenter="this.style.background='rgba(100,100,255,0.1)'" onmouseleave="this.style.background='transparent'">' + arrow + '  ' + label + '</div>';
+  return '<div data-bw-section="' + id + '" class="bw-sec-hdr">' + arrow + '  ' + label + '</div>';
 };
 BwDebugOverlay.prototype._heatCell = function(val, mx) {
   var t = mx > 0 ? Math.min(Math.abs(val) / mx, 1) : 0;
