@@ -18,7 +18,7 @@ import {
   Arrow, LBrace, RBrace, LParen, RParen, LBracket, RBracket,
   Equals, Comma, Dot, Colon, Star,
   StringLiteral, TimeLiteral, NumberLiteral, Identifier,
-} from "./lexer";
+} from "./lexer.js";
 
 export class BrainWebParser extends CstParser {
   constructor() {

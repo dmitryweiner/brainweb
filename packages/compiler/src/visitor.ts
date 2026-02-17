@@ -1,12 +1,12 @@
 import { CstNode, IToken } from "chevrotain";
-import { parserInstance } from "./parser";
+import { parserInstance } from "./parser.js";
 import {
   AppNode, Declaration, SensorNode, EncoderNode, SensorPattern, FeatureOp,
   RegionNode, PopulationNode, ProjectionNode, TopologyExpr, WeightInitExpr,
   LearningRuleExpr, CircuitNode, ModulatorNode, EffectorNode, BindingNode,
   RuntimeNode, StepNode, GuardNode, TimeValue, NumberOrLen,
   PlasticityNode, Loc,
-} from "./ast";
+} from "./ast.js";
 
 const BaseCstVisitor = parserInstance.getBaseCstVisitorConstructor();
 

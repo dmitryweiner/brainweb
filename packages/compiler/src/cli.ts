@@ -2,7 +2,7 @@
 
 import * as fs from "fs";
 import * as path from "path";
-import { compile } from "./index";
+import { compile } from "./index.js";
 
 function main(): void {
   const args = process.argv.slice(2);

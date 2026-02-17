@@ -1,27 +1,27 @@
-export { BrainWebLexer, allTokens } from "./lexer";
-export { BrainWebParser, parserInstance } from "./parser";
-export { visitorInstance } from "./visitor";
-export { validate, Diagnostic, SymbolTable } from "./validate";
-export { lower } from "./lower";
-export { generateJS } from "./codegen";
-export * from "./ir";
-export * from "./ast";
+export { BrainWebLexer, allTokens } from "./lexer.js";
+export { BrainWebParser, parserInstance } from "./parser.js";
+export { visitorInstance } from "./visitor.js";
+export { validate, Diagnostic, SymbolTable } from "./validate.js";
+export { lower } from "./lower.js";
+export { generateJS } from "./codegen.js";
+export * from "./ir.js";
+export * from "./ast.js";
 
-import { BrainWebLexer } from "./lexer";
-import { parserInstance } from "./parser";
-import { visitorInstance } from "./visitor";
-import { validate } from "./validate";
-import { lower } from "./lower";
-import { generateJS } from "./codegen";
-import { AppNode } from "./ast";
-import { AppIR } from "./ir";
+import { BrainWebLexer } from "./lexer.js";
+import { parserInstance } from "./parser.js";
+import { visitorInstance } from "./visitor.js";
+import { validate } from "./validate.js";
+import { lower } from "./lower.js";
+import { generateJS } from "./codegen.js";
+import { AppNode } from "./ast.js";
+import { AppIR } from "./ir.js";
 
 export interface CompileResult {
   ast: AppNode;
   ir: AppIR;
   js: string;
   graphJson: string;
-  diagnostics: import("./validate").Diagnostic[];
+  diagnostics: import("./validate.js").Diagnostic[];
 }
 
 export function compile(source: string): CompileResult {

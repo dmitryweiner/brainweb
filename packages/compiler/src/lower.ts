@@ -2,12 +2,12 @@ import {
   AppNode, Declaration, SensorNode, EncoderNode, RegionNode,
   CircuitNode, EffectorNode, RuntimeNode, PopulationNode,
   ProjectionNode, TimeValue, timeToMs, NumberOrLen,
-} from "./ast";
+} from "./ast.js";
 import {
   AppIR, SensorIR, EncoderIR, SensorPatternIR, FeatureOpIR,
   ModuleIR, ProjectionIR, TopologyIR, InitIR, LearningIR,
   EffectorIR, EffectorBindingIR, RuntimeIR, TickIR, StepIR, GuardIR,
-} from "./ir";
+} from "./ir.js";
 
 export function lower(app: AppNode): AppIR {
   const sensors: SensorIR[] = [];
@@ -62,7 +62,7 @@ function lowerEncoder(e: EncoderNode): EncoderIR {
   };
 }
 
-function lowerFeatureOp(op: import("./ast").FeatureOp): FeatureOpIR {
+function lowerFeatureOp(op: import("./ast.js").FeatureOp): FeatureOpIR {
   switch (op.kind) {
     case "onehot": return { kind: "onehot", field: op.arg };
     case "bucket": return { kind: "bucket", field: op.arg, bins: op.bins };
@@ -193,7 +193,7 @@ function qualifyName(name: string, prefix: string): string {
   return `${prefix}__${name}`;
 }
 
-function lowerTopology(t: import("./ast").TopologyExpr): TopologyIR {
+function lowerTopology(t: import("./ast.js").TopologyExpr): TopologyIR {
   switch (t.kind) {
     case "dense": return { kind: "dense" };
     case "sparse_random": return { kind: "sparse_random", p: t.p, seed: t.seed };
@@ -203,7 +203,7 @@ function lowerTopology(t: import("./ast").TopologyExpr): TopologyIR {
   }
 }
 
-function lowerInit(i: import("./ast").WeightInitExpr): InitIR {
+function lowerInit(i: import("./ast.js").WeightInitExpr): InitIR {
   switch (i.kind) {
     case "normal": return { kind: "normal", mu: i.mu, sigma: i.sigma };
     case "uniform": return { kind: "uniform", a: i.a, b: i.b };
@@ -211,7 +211,7 @@ function lowerInit(i: import("./ast").WeightInitExpr): InitIR {
   }
 }
 
-function lowerLearning(r: import("./ast").LearningRuleExpr): LearningIR {
+function lowerLearning(r: import("./ast.js").LearningRuleExpr): LearningIR {
   switch (r.kind) {
     case "hebbian": return { kind: "hebbian", traceMs: timeToMs(r.trace) };
     case "none": return { kind: "none" };

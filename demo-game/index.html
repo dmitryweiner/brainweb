@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BrainWeb — Guess the Button</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0d1117;
+      color: #c9d1d9;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .game {
+      text-align: center;
+      padding: 40px 20px;
+    }
+
+    h1 {
+      color: #58a6ff;
+      font-size: 32px;
+      margin: 0 0 8px;
+    }
+
+    .subtitle {
+      color: #8b949e;
+      font-size: 14px;
+      margin: 0 0 40px;
+    }
+
+    .score {
+      font-size: 48px;
+      font-weight: 700;
+      color: #e6edf3;
+      margin-bottom: 32px;
+    }
+
+    .score span {
+      color: #58a6ff;
+    }
+
+    .buttons {
+      display: flex;
+      gap: 20px;
+      justify-content: center;
+      margin-bottom: 32px;
+    }
+
+    .game-btn {
+      width: 120px;
+      height: 120px;
+      border-radius: 16px;
+      border: 2px solid #30363d;
+      background: #21262d;
+      color: #c9d1d9;
+      font-size: 36px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    .game-btn:hover {
+      border-color: #58a6ff;
+      background: #30363d;
+      color: #fff;
+      transform: scale(1.05);
+    }
+
+    .game-btn:active {
+      transform: scale(0.97);
+    }
+
+    .game-btn.correct {
+      background: #238636;
+      border-color: #2ea043;
+      color: #fff;
+    }
+
+    .game-btn.wrong {
+      background: #da3633;
+      border-color: #f85149;
+      color: #fff;
+    }
+
+    .game-btn.locked {
+      cursor: default;
+      opacity: 0.7;
+    }
+
+    .game-btn.locked:hover {
+      transform: none;
+      border-color: #30363d;
+      background: #21262d;
+      color: #c9d1d9;
+    }
+
+    .game-btn.locked.correct:hover {
+      background: #238636;
+      border-color: #2ea043;
+      color: #fff;
+    }
+
+    .game-btn.locked.wrong:hover {
+      background: #da3633;
+      border-color: #f85149;
+      color: #fff;
+    }
+
+    .status {
+      font-size: 18px;
+      height: 28px;
+      color: #8b949e;
+      transition: color 0.2s;
+    }
+
+    .status.good {
+      color: #3fb950;
+    }
+
+    .status.bad {
+      color: #f85149;
+    }
+
+    .powered-by {
+      margin-top: 48px;
+      font-size: 12px;
+      color: #484f58;
+    }
+
+    .powered-by a {
+      color: #58a6ff;
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+
+<div class="game">
+  <h1>Guess the Button</h1>
+  <p class="subtitle">One button is correct. Pick wisely!</p>
+
+  <div class="score">Score: <span id="score">0</span></div>
+
+  <div class="buttons">
+    <button class="game-btn" id="btn-a">A</button>
+    <button class="game-btn" id="btn-b">B</button>
+    <button class="game-btn" id="btn-c">C</button>
+  </div>
+
+  <div class="status" id="status">Pick a button!</div>
+
+  <div class="powered-by">Powered by <a href="#">BrainWeb</a> neuromorphic engine</div>
+</div>
+
+<script src="app.runtime.js"></script>
+<script>
+  var score = 0;
+  var locked = false;
+  var buttons = ["a", "b", "c"];
+  var secretButton = buttons[Math.floor(Math.random() * 3)];
+
+  function pickSecret() {
+    secretButton = buttons[Math.floor(Math.random() * 3)];
+  }
+
+  function resetButtons() {
+    var els = document.querySelectorAll(".game-btn");
+    for (var i = 0; i < els.length; i++) {
+      els[i].classList.remove("correct", "wrong", "locked");
+    }
+  }
+
+  function lockButtons() {
+    var els = document.querySelectorAll(".game-btn");
+    for (var i = 0; i < els.length; i++) {
+      els[i].classList.add("locked");
+    }
+  }
+
+  var fx = {
+    evaluate: function(ctx) {
+      if (locked) return;
+
+      var target = ctx.target || "";
+      var clicked = null;
+      if (target.indexOf("btn-a") !== -1) clicked = "a";
+      else if (target.indexOf("btn-b") !== -1) clicked = "b";
+      else if (target.indexOf("btn-c") !== -1) clicked = "c";
+
+      if (!clicked) return;
+
+      locked = true;
+      lockButtons();
+
+      var btnEl = document.getElementById("btn-" + clicked);
+      var statusEl = document.getElementById("status");
+
+      if (clicked === secretButton) {
+        btnEl.classList.add("correct");
+        score++;
+        document.getElementById("score").textContent = score;
+        statusEl.textContent = "Correct!";
+        statusEl.className = "status good";
+      } else {
+        btnEl.classList.add("wrong");
+        var correctEl = document.getElementById("btn-" + secretButton);
+        correctEl.classList.add("correct");
+        statusEl.textContent = "Wrong! It was " + secretButton.toUpperCase();
+        statusEl.className = "status bad";
+      }
+
+      setTimeout(function() {
+        resetButtons();
+        pickSecret();
+        locked = false;
+        statusEl.textContent = "Pick a button!";
+        statusEl.className = "status";
+      }, 800);
+    }
+  };
+
+  var app = BrainWeb.createApp(fx, { seed: 42, debug: false });
+  app.start();
+</script>
+
+</body>
+</html>

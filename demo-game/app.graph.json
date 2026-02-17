@@ -1,0 +1,129 @@
+{
+  "name": "GuessGame",
+  "sensors": [
+    {
+      "name": "UI",
+      "eventTypes": [
+        "Click"
+      ]
+    }
+  ],
+  "encoders": [
+    {
+      "name": "Enc",
+      "inputs": [
+        {
+          "sensor": "UI",
+          "event": "*"
+        }
+      ],
+      "dim": 16,
+      "featureOps": [
+        {
+          "kind": "onehot",
+          "field": "EventType"
+        },
+        {
+          "kind": "hash",
+          "field": "TargetCssPath",
+          "buckets": 8
+        }
+      ]
+    }
+  ],
+  "modules": [
+    {
+      "kind": "State",
+      "name": "Core__Ctx",
+      "slots": 2,
+      "decayMs": 3000,
+      "merge": "overwrite"
+    },
+    {
+      "kind": "Rate",
+      "name": "Gate__AV",
+      "units": 2
+    },
+    {
+      "kind": "Rate",
+      "name": "Gate__W",
+      "units": 2
+    },
+    {
+      "kind": "ActionSelector",
+      "name": "Gate",
+      "actions": [
+        "React",
+        "Think"
+      ],
+      "temperature": 1
+    }
+  ],
+  "projections": [
+    {
+      "from": "Gate__AV",
+      "to": "Gate__W",
+      "topology": {
+        "kind": "softmax",
+        "temperature": 1
+      },
+      "init": {
+        "kind": "default"
+      }
+    }
+  ],
+  "effectors": [
+    {
+      "name": "Eff",
+      "bindings": [
+        {
+          "action": "React",
+          "kind": "js",
+          "expr": "fx.evaluate(ctx)"
+        },
+        {
+          "action": "Think",
+          "kind": "js",
+          "expr": "fx.evaluate(ctx)"
+        }
+      ]
+    }
+  ],
+  "runtime": {
+    "tick": {
+      "mode": "RAF"
+    },
+    "steps": [
+      {
+        "kind": "ingest",
+        "sensors": [
+          "UI"
+        ]
+      },
+      {
+        "kind": "run",
+        "module": "Enc"
+      },
+      {
+        "kind": "run",
+        "module": "Core.Ctx"
+      },
+      {
+        "kind": "run",
+        "module": "Gate"
+      },
+      {
+        "kind": "emit",
+        "effector": "Eff",
+        "from": "Gate.W",
+        "winnerOnly": true
+      }
+    ],
+    "guards": [
+      {
+        "kind": "max_effects_per_sec",
+        "limit": 10
+      }
+    ]
+  }
+}

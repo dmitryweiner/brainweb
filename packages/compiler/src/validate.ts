@@ -2,7 +2,7 @@ import {
   AppNode, Declaration, SensorNode, EncoderNode, RegionNode,
   CircuitNode, EffectorNode, RuntimeNode, BindingNode,
   PopulationNode, ProjectionNode,
-} from "./ast";
+} from "./ast.js";
 
 export interface Diagnostic {
   level: "error" | "warning";
