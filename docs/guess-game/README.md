@@ -9,7 +9,7 @@ Three buttons -- A, B, C -- are shown on screen. The computer secretly picks one
 Serve the directory with any HTTP server:
 
 ```bash
-cd demos/guess-game && npx serve .
+cd docs/guess-game && npx serve .
 ```
 
 Open http://localhost:3000 in a browser.
@@ -19,7 +19,7 @@ Open http://localhost:3000 in a browser.
 If you edit `game.brainweb`, regenerate the runtime with:
 
 ```bash
-yarn compile demos/guess-game/game.brainweb --out demos/guess-game/
+yarn compile docs/guess-game/game.brainweb --out docs/guess-game/
 ```
 
 ## How `game.brainweb` works

@@ -1,0 +1,63 @@
+// Smart Adaptive Dashboard — BrainWeb showcase demo
+// Demonstrates: multiple sensors, all 6 encoder ops, rich context,
+// 6-action circuit, interval tick, both guards.
+
+app SmartDashboard {
+
+  // Two sensor domains covering 7 DOM event types
+  sensor UI    : events(Click, Input, KeyDown, Focus, Blur)
+  sensor Mouse : events(MouseMove, Scroll)
+
+  // Encoder using all 6 feature operations
+  encoder Enc {
+    in = [UI.*, Mouse.*]
+    out = FeatureVector dim=128
+    policy = {
+      onehot(EventType)
+      bucket(TimeDelta, 16)
+      hash(TargetCssPath, 64)
+      numeric(scrollY)
+      clamp(inputLen, 0, 100)
+      scale(clientX, 0.001)
+    }
+  }
+
+  // 8-slot context with 10-second decay window
+  region Cortex {
+    population Memory : state(slots=8, decay=10s, merge="overwrite")
+  }
+
+  // 6 distinct actions for the brain to choose from
+  circuit Gate {
+    actions = [HighlightWidget, SuggestTask, CollapseIdle, RefreshFeed, ShowShortcut, Ignore]
+    population AV : rate(units=6)
+    population W  : winner_take_all(units=6)
+    projection AV -> W { topology = softmax(temp=0.7) }
+  }
+
+  // Each action maps to a distinct visual effect
+  effector Eff {
+    bind HighlightWidget -> js("fx.highlightWidget(ctx)")
+    bind SuggestTask     -> js("fx.suggestTask(ctx)")
+    bind CollapseIdle    -> js("fx.collapseIdle(ctx)")
+    bind RefreshFeed     -> js("fx.refreshFeed(ctx)")
+    bind ShowShortcut    -> js("fx.showShortcut(ctx)")
+    bind Ignore          -> noop
+  }
+
+  // Interval-based tick (1 Hz) — brain evaluates once per second
+  runtime {
+    tick = Tick1s
+    step {
+      ingest [UI, Mouse]
+      run Enc
+      run Cortex.Memory
+      run Gate
+      emit Eff from=Gate.W winner_only
+    }
+    guards {
+      max_effects_per_sec = 2
+      suppress_repeats(window=5s)
+    }
+  }
+}

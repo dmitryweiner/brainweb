@@ -1,0 +1,193 @@
+{
+  "name": "SmartDashboard",
+  "sensors": [
+    {
+      "name": "UI",
+      "eventTypes": [
+        "Click",
+        "Input",
+        "KeyDown",
+        "Focus",
+        "Blur"
+      ]
+    },
+    {
+      "name": "Mouse",
+      "eventTypes": [
+        "MouseMove",
+        "Scroll"
+      ]
+    }
+  ],
+  "encoders": [
+    {
+      "name": "Enc",
+      "inputs": [
+        {
+          "sensor": "UI",
+          "event": "*"
+        },
+        {
+          "sensor": "Mouse",
+          "event": "*"
+        }
+      ],
+      "dim": 128,
+      "featureOps": [
+        {
+          "kind": "onehot",
+          "field": "EventType"
+        },
+        {
+          "kind": "bucket",
+          "field": "TimeDelta",
+          "bins": 16
+        },
+        {
+          "kind": "hash",
+          "field": "TargetCssPath",
+          "buckets": 64
+        },
+        {
+          "kind": "numeric",
+          "field": "scrollY"
+        },
+        {
+          "kind": "clamp",
+          "field": "inputLen",
+          "min": 0,
+          "max": 100
+        },
+        {
+          "kind": "scale",
+          "field": "clientX",
+          "factor": 0.001
+        }
+      ]
+    }
+  ],
+  "modules": [
+    {
+      "kind": "State",
+      "name": "Cortex__Memory",
+      "slots": 8,
+      "decayMs": 10000,
+      "merge": "overwrite"
+    },
+    {
+      "kind": "Rate",
+      "name": "Gate__AV",
+      "units": 6
+    },
+    {
+      "kind": "Rate",
+      "name": "Gate__W",
+      "units": 6
+    },
+    {
+      "kind": "ActionSelector",
+      "name": "Gate",
+      "actions": [
+        "HighlightWidget",
+        "SuggestTask",
+        "CollapseIdle",
+        "RefreshFeed",
+        "ShowShortcut",
+        "Ignore"
+      ],
+      "temperature": 0.7
+    }
+  ],
+  "projections": [
+    {
+      "from": "Gate__AV",
+      "to": "Gate__W",
+      "topology": {
+        "kind": "softmax",
+        "temperature": 0.7
+      },
+      "init": {
+        "kind": "default"
+      }
+    }
+  ],
+  "effectors": [
+    {
+      "name": "Eff",
+      "bindings": [
+        {
+          "action": "HighlightWidget",
+          "kind": "js",
+          "expr": "fx.highlightWidget(ctx)"
+        },
+        {
+          "action": "SuggestTask",
+          "kind": "js",
+          "expr": "fx.suggestTask(ctx)"
+        },
+        {
+          "action": "CollapseIdle",
+          "kind": "js",
+          "expr": "fx.collapseIdle(ctx)"
+        },
+        {
+          "action": "RefreshFeed",
+          "kind": "js",
+          "expr": "fx.refreshFeed(ctx)"
+        },
+        {
+          "action": "ShowShortcut",
+          "kind": "js",
+          "expr": "fx.showShortcut(ctx)"
+        },
+        {
+          "action": "Ignore",
+          "kind": "noop"
+        }
+      ]
+    }
+  ],
+  "runtime": {
+    "tick": {
+      "mode": "Interval",
+      "ms": 1000
+    },
+    "steps": [
+      {
+        "kind": "ingest",
+        "sensors": [
+          "UI",
+          "Mouse"
+        ]
+      },
+      {
+        "kind": "run",
+        "module": "Enc"
+      },
+      {
+        "kind": "run",
+        "module": "Cortex.Memory"
+      },
+      {
+        "kind": "run",
+        "module": "Gate"
+      },
+      {
+        "kind": "emit",
+        "effector": "Eff",
+        "from": "Gate.W",
+        "winnerOnly": true
+      }
+    ],
+    "guards": [
+      {
+        "kind": "max_effects_per_sec",
+        "limit": 2
+      },
+      {
+        "kind": "suppress_repeats",
+        "windowMs": 5000
+      }
+    ]
+  }
+}

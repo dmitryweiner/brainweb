@@ -129,10 +129,10 @@ The HTML page provides:
 
 ```bash
 # From the repo root
-yarn compile demos/tictactoe/tictactoe.brainweb --out demos/tictactoe/
+yarn compile docs/tictactoe/tictactoe.brainweb --out docs/tictactoe/
 
 # Serve
-cd demos/tictactoe && npx serve .
+cd docs/tictactoe && npx serve .
 ```
 
 Open http://localhost:3000 and click any cell to play.

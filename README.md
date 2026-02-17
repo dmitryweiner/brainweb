@@ -60,10 +60,11 @@ brainweb/
         modules/
           contextMemory.ts   # Stateful context with decay
           actionSelector.ts  # Linear scoring + softmax + argmax
-  demos/
+  docs/
     click-demo/          # Basic click/input/scroll demo
     guess-game/          # Guess-the-button game
     tictactoe/           # Tic-tac-toe (human vs AI)
+    dashboard/           # Smart adaptive dashboard (full feature showcase)
 ```
 
 ## Quick Start
@@ -88,13 +89,13 @@ yarn build
 ### Compile a `.brainweb` program
 
 ```bash
-node packages/compiler/dist/cli.js demos/click-demo/demo.brainweb --out demos/click-demo/
+node packages/compiler/dist/cli.js docs/click-demo/demo.brainweb --out docs/click-demo/
 ```
 
 Or use the convenience script:
 
 ```bash
-yarn compile demos/click-demo/demo.brainweb --out demos/click-demo/
+yarn compile docs/click-demo/demo.brainweb --out docs/click-demo/
 ```
 
 ### Run a demo
@@ -102,7 +103,7 @@ yarn compile demos/click-demo/demo.brainweb --out demos/click-demo/
 Serve any demo directory with an HTTP server:
 
 ```bash
-cd demos/click-demo && npx serve .
+cd docs/click-demo && npx serve .
 ```
 
 Open http://localhost:3000 in your browser. Click buttons, type text, and scroll -- the debug overlay in the bottom-right corner shows live event ingestion, context state, action probabilities, and the chosen winner.
@@ -111,9 +112,10 @@ Open http://localhost:3000 in your browser. Click buttons, type text, and scroll
 
 | Demo | Description |
 |---|---|
-| `demos/click-demo/` | Basic click, input, and scroll event handling with toast and highlight effects |
-| `demos/guess-game/` | Guess-the-button game |
-| `demos/tictactoe/` | Tic-tac-toe: human (X) vs unbeatable minimax AI (O) |
+| [`docs/click-demo/`](https://dmitryweiner.github.io/brainweb/click-demo/) | Basic click, input, and scroll event handling with toast and highlight effects |
+| [`docs/guess-game/`](https://dmitryweiner.github.io/brainweb/guess-game/) | Guess-the-button game |
+| [`docs/tictactoe/`](https://dmitryweiner.github.io/brainweb/tictactoe/) | Tic-tac-toe: human (X) vs unbeatable minimax AI (O) |
+| [`docs/dashboard/`](https://dmitryweiner.github.io/brainweb/dashboard/) | Smart adaptive dashboard -- full feature showcase (all 6 encoder ops, 7 event types, 6-action circuit, interval tick, record/replay) |
 
 ### Run tests
 

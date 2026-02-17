@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BrainWeb — Smart Adaptive Dashboard</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0b0f19;
+      --surface:   #131a2b;
+      --border:    #1e2a42;
+      --border-hi: #3b82f6;
+      --text:      #d1d5db;
+      --text-dim:  #6b7280;
+      --accent:    #3b82f6;
+      --accent2:   #8b5cf6;
+      --green:     #10b981;
+      --amber:     #f59e0b;
+      --red:       #ef4444;
+      --radius:    12px;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+
+    /* ── Header ── */
+    .header {
+      padding: 24px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+    }
+    .header-left { display: flex; align-items: center; gap: 16px; }
+    .header h1 {
+      font-size: 22px;
+      font-weight: 700;
+      color: #f3f4f6;
+      letter-spacing: -0.5px;
+    }
+    .brain-pulse {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 8px var(--green);
+      animation: pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(1.3); }
+    }
+    .header-right { display: flex; gap: 8px; align-items: center; }
+    .badge {
+      font-size: 11px;
+      padding: 3px 10px;
+      border-radius: 20px;
+      background: rgba(59,130,246,0.15);
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    /* ── Dashboard Grid ── */
+    .dashboard {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      padding: 24px 32px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    @media (max-width: 768px) { .dashboard { grid-template-columns: 1fr; } }
+
+    /* ── Widget Cards ── */
+    .widget {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      transition: border-color 0.3s, opacity 0.6s, box-shadow 0.3s;
+      position: relative;
+    }
+    .widget:hover { border-color: rgba(59,130,246,0.4); }
+    .widget-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+    .widget-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #f3f4f6;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .widget-icon {
+      width: 28px; height: 28px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+    }
+    .icon-tasks  { background: rgba(16,185,129,0.15); color: var(--green); }
+    .icon-notes  { background: rgba(139,92,246,0.15); color: var(--accent2); }
+    .icon-stats  { background: rgba(245,158,11,0.15); color: var(--amber); }
+    .icon-feed   { background: rgba(59,130,246,0.15); color: var(--accent); }
+
+    /* Glow effect for HighlightWidget */
+    .widget-glow {
+      box-shadow: 0 0 0 2px var(--accent), 0 0 20px rgba(59,130,246,0.3);
+      border-color: var(--accent) !important;
+    }
+    /* Collapse effect for CollapseIdle */
+    .widget-collapsed { opacity: 0.35; }
+
+    /* ── Tasks Widget ── */
+    .task-input-row { display: flex; gap: 8px; margin-bottom: 12px; }
+    .task-input {
+      flex: 1;
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+      font-size: 13px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .task-input:focus { border-color: var(--accent); }
+    .task-add-btn {
+      padding: 8px 14px;
+      border-radius: 8px;
+      border: none;
+      background: var(--green);
+      color: #fff;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .task-add-btn:hover { background: #059669; }
+    .task-list { list-style: none; }
+    .task-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(30,42,66,0.6);
+      font-size: 13px;
+      cursor: pointer;
+      transition: color 0.2s;
+    }
+    .task-item:last-child { border-bottom: none; }
+    .task-check {
+      width: 18px; height: 18px;
+      border-radius: 50%;
+      border: 2px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: all 0.2s;
+    }
+    .task-item.done .task-check {
+      background: var(--green);
+      border-color: var(--green);
+    }
+    .task-item.done .task-check::after {
+      content: "\2713";
+      color: #fff;
+      font-size: 11px;
+    }
+    .task-item.done .task-label {
+      text-decoration: line-through;
+      color: var(--text-dim);
+    }
+
+    /* ── Notes Widget ── */
+    .notes-area {
+      width: 100%;
+      height: 160px;
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+      font-size: 13px;
+      font-family: inherit;
+      line-height: 1.6;
+      resize: vertical;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .notes-area:focus { border-color: var(--accent2); }
+    .notes-count {
+      text-align: right;
+      font-size: 11px;
+      color: var(--text-dim);
+      margin-top: 6px;
+    }
+
+    /* ── Stats Widget ── */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .stat-card {
+      background: var(--bg);
+      border-radius: 8px;
+      padding: 14px;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: all 0.2s;
+    }
+    .stat-card:hover { border-color: var(--border); }
+    .stat-value {
+      font-size: 24px;
+      font-weight: 700;
+      color: #f3f4f6;
+    }
+    .stat-label {
+      font-size: 11px;
+      color: var(--text-dim);
+      margin-top: 2px;
+    }
+    .stat-trend {
+      font-size: 11px;
+      font-weight: 600;
+      margin-top: 4px;
+    }
+    .trend-up { color: var(--green); }
+    .trend-down { color: var(--red); }
+
+    /* ── Feed Widget ── */
+    .feed-list {
+      max-height: 220px;
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: var(--border) transparent;
+    }
+    .feed-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(30,42,66,0.4);
+      font-size: 12px;
+    }
+    .feed-item:last-child { border-bottom: none; }
+    .feed-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      margin-top: 5px;
+      flex-shrink: 0;
+    }
+    .feed-time {
+      color: var(--text-dim);
+      font-size: 10px;
+      white-space: nowrap;
+      min-width: 50px;
+    }
+    .feed-text { color: var(--text); }
+
+    /* ── Controls Bar ── */
+    .controls-bar {
+      padding: 16px 32px;
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .ctrl-btn {
+      padding: 7px 16px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .ctrl-btn:hover { border-color: var(--accent); color: #fff; }
+    .ctrl-btn.recording {
+      background: rgba(239,68,68,0.15);
+      border-color: var(--red);
+      color: var(--red);
+    }
+    .ctrl-status {
+      font-size: 11px;
+      color: var(--text-dim);
+      margin-left: auto;
+    }
+
+    /* ── Shortcut Tooltip ── */
+    .shortcut-tip {
+      position: fixed;
+      padding: 8px 14px;
+      background: rgba(139,92,246,0.95);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 600;
+      border-radius: 8px;
+      pointer-events: none;
+      z-index: 999998;
+      animation: tipIn 0.25s ease-out;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+    }
+    @keyframes tipIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── Suggestion Toast ── */
+    .suggestion-container {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 999998;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      align-items: center;
+      pointer-events: none;
+    }
+    .suggestion {
+      padding: 10px 20px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #fff;
+      font-size: 13px;
+      font-weight: 600;
+      border-radius: 10px;
+      box-shadow: 0 4px 20px rgba(59,130,246,0.35);
+      animation: sugIn 0.3s ease-out, sugOut 0.4s ease-in 2.6s forwards;
+    }
+    @keyframes sugIn {
+      from { opacity: 0; transform: translateY(-12px) scale(0.95); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    @keyframes sugOut {
+      from { opacity: 1; }
+      to   { opacity: 0; transform: translateY(-8px); }
+    }
+
+    /* ── Keyboard Shortcuts Footer ── */
+    .shortcuts-bar {
+      padding: 12px 32px;
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      gap: 24px;
+      flex-wrap: wrap;
+    }
+    .shortcut-item {
+      font-size: 11px;
+      color: var(--text-dim);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .shortcut-key {
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      font-family: 'SF Mono', Consolas, monospace;
+      font-size: 10px;
+      color: var(--text);
+    }
+  </style>
+</head>
+<body>
+
+<div class="suggestion-container" id="suggestion-container"></div>
+
+<!-- Header -->
+<div class="header">
+  <div class="header-left">
+    <div class="brain-pulse"></div>
+    <h1>Smart Dashboard</h1>
+    <span class="badge">BrainWeb</span>
+  </div>
+  <div class="header-right">
+    <span class="badge" id="tick-badge">Tick: 1 Hz</span>
+    <span class="badge" id="action-badge">Idle</span>
+  </div>
+</div>
+
+<!-- Dashboard Grid -->
+<div class="dashboard">
+
+  <!-- Tasks Widget -->
+  <div class="widget" id="widget-tasks" data-widget="tasks">
+    <div class="widget-header">
+      <div class="widget-title">
+        <div class="widget-icon icon-tasks">&#9745;</div>
+        Tasks
+      </div>
+      <span id="task-count" style="font-size:11px;color:var(--text-dim)">0 / 0</span>
+    </div>
+    <div class="task-input-row">
+      <input class="task-input" id="task-input" type="text" placeholder="Add a new task...">
+      <button class="task-add-btn" id="task-add-btn">Add</button>
+    </div>
+    <ul class="task-list" id="task-list">
+      <li class="task-item" data-idx="0"><div class="task-check"></div><span class="task-label">Review pull requests</span></li>
+      <li class="task-item" data-idx="1"><div class="task-check"></div><span class="task-label">Update API docs</span></li>
+      <li class="task-item" data-idx="2"><div class="task-check"></div><span class="task-label">Fix login bug #342</span></li>
+    </ul>
+  </div>
+
+  <!-- Notes Widget -->
+  <div class="widget" id="widget-notes" data-widget="notes">
+    <div class="widget-header">
+      <div class="widget-title">
+        <div class="widget-icon icon-notes">&#9998;</div>
+        Notes
+      </div>
+    </div>
+    <textarea class="notes-area" id="notes-area" placeholder="Write your thoughts here..."></textarea>
+    <div class="notes-count" id="notes-count">0 chars</div>
+  </div>
+
+  <!-- Stats Widget -->
+  <div class="widget" id="widget-stats" data-widget="stats">
+    <div class="widget-header">
+      <div class="widget-title">
+        <div class="widget-icon icon-stats">&#9733;</div>
+        Metrics
+      </div>
+    </div>
+    <div class="stats-grid">
+      <div class="stat-card" id="stat-events">
+        <div class="stat-value" id="stat-events-val">0</div>
+        <div class="stat-label">Events Seen</div>
+        <div class="stat-trend trend-up" id="stat-events-trend">--</div>
+      </div>
+      <div class="stat-card" id="stat-actions">
+        <div class="stat-value" id="stat-actions-val">0</div>
+        <div class="stat-label">Actions Taken</div>
+        <div class="stat-trend trend-up" id="stat-actions-trend">--</div>
+      </div>
+      <div class="stat-card" id="stat-tasks">
+        <div class="stat-value" id="stat-tasks-val">0</div>
+        <div class="stat-label">Tasks Done</div>
+        <div class="stat-trend trend-up">today</div>
+      </div>
+      <div class="stat-card" id="stat-notes">
+        <div class="stat-value" id="stat-notes-val">0</div>
+        <div class="stat-label">Words Written</div>
+        <div class="stat-trend trend-up">session</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Activity Feed Widget -->
+  <div class="widget" id="widget-feed" data-widget="feed">
+    <div class="widget-header">
+      <div class="widget-title">
+        <div class="widget-icon icon-feed">&#9889;</div>
+        Brain Activity
+      </div>
+      <span id="feed-count" style="font-size:11px;color:var(--text-dim)">0 entries</span>
+    </div>
+    <div class="feed-list" id="feed-list">
+      <div class="feed-item">
+        <div class="feed-dot" style="background:var(--green)"></div>
+        <span class="feed-time">now</span>
+        <span class="feed-text">Dashboard initialized. Brain is listening...</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Keyboard Shortcuts -->
+<div class="shortcuts-bar">
+  <div class="shortcut-item"><span class="shortcut-key">Tab</span> Navigate widgets</div>
+  <div class="shortcut-item"><span class="shortcut-key">Enter</span> Add task</div>
+  <div class="shortcut-item"><span class="shortcut-key">Click</span> Toggle task</div>
+  <div class="shortcut-item"><span class="shortcut-key">Scroll</span> Browse feed</div>
+  <div class="shortcut-item"><span class="shortcut-key">Type</span> Write notes</div>
+</div>
+
+<!-- Controls Bar -->
+<div class="controls-bar">
+  <button class="ctrl-btn" id="btn-record">Record Session</button>
+  <button class="ctrl-btn" id="btn-replay">Replay</button>
+  <button class="ctrl-btn" id="btn-reset">Reset Widgets</button>
+  <span class="ctrl-status" id="ctrl-status">Brain active &mdash; 1 Hz tick loop</span>
+</div>
+
+<script src="app.runtime.js"></script>
+<script>
+(function() {
+  "use strict";
+
+  // ── State ──
+  var totalEvents = 0;
+  var totalActions = 0;
+  var widgetActivity = {};
+  var tasksDone = 0;
+  var totalTasks = 3;
+  var feedEntries = 0;
+
+  var shortcutMap = {
+    tasks:  "Enter to add, Click to toggle",
+    notes:  "Just start typing...",
+    stats:  "Click a card to inspect",
+    feed:   "Scroll to browse history"
+  };
+
+  var suggestions = [
+    "Try clicking on different widgets",
+    "Add a task and check it off!",
+    "Write some notes to generate Input events",
+    "Scroll the activity feed",
+    "Watch the debug overlay for brain state",
+    "The brain evaluates once per second",
+    "Context decays over 10 seconds",
+    "Try focusing different input fields"
+  ];
+
+  function now() { return new Date(); }
+  function timeStr(d) {
+    return String(d.getHours()).padStart(2, "0") + ":" +
+           String(d.getMinutes()).padStart(2, "0") + ":" +
+           String(d.getSeconds()).padStart(2, "0");
+  }
+
+  // ── Widget helpers ──
+  function findWidget(target) {
+    if (!target) return null;
+    var el;
+    try { el = document.querySelector(target); } catch(e) { return null; }
+    if (!el) return null;
+    while (el && !el.classList.contains("widget")) {
+      el = el.parentElement;
+    }
+    return el;
+  }
+
+  function getWidgetName(el) {
+    return el ? (el.dataset.widget || el.id || "unknown") : "unknown";
+  }
+
+  function touchWidget(name) {
+    widgetActivity[name] = Date.now();
+  }
+
+  function addFeedEntry(color, text) {
+    var list = document.getElementById("feed-list");
+    var item = document.createElement("div");
+    item.className = "feed-item";
+    item.innerHTML =
+      '<div class="feed-dot" style="background:' + color + '"></div>' +
+      '<span class="feed-time">' + timeStr(now()) + '</span>' +
+      '<span class="feed-text">' + text + '</span>';
+    list.insertBefore(item, list.firstChild);
+    feedEntries++;
+    document.getElementById("feed-count").textContent = feedEntries + " entries";
+    if (list.children.length > 50) list.removeChild(list.lastChild);
+  }
+
+  function updateStats() {
+    document.getElementById("stat-events-val").textContent = totalEvents;
+    document.getElementById("stat-actions-val").textContent = totalActions;
+    document.getElementById("stat-tasks-val").textContent = tasksDone;
+    var words = (document.getElementById("notes-area").value.match(/\S+/g) || []).length;
+    document.getElementById("stat-notes-val").textContent = words;
+  }
+
+  // ── Effect handlers (fx object) ──
+  var fx = {
+
+    // 1. HighlightWidget: glow the widget containing the last event target
+    highlightWidget: function(ctx) {
+      totalActions++;
+      var widget = findWidget(ctx.target);
+      if (!widget) widget = document.getElementById("widget-tasks");
+      widget.classList.add("widget-glow");
+      var wName = getWidgetName(widget);
+      touchWidget(wName);
+      addFeedEntry("var(--accent)", "Highlighted <b>" + wName + "</b> widget");
+      document.getElementById("action-badge").textContent = "Highlight";
+      setTimeout(function() { widget.classList.remove("widget-glow"); }, 2000);
+      updateStats();
+    },
+
+    // 2. SuggestTask: show a contextual suggestion toast
+    suggestTask: function(ctx) {
+      totalActions++;
+      var container = document.getElementById("suggestion-container");
+      var el = document.createElement("div");
+      el.className = "suggestion";
+      var idx = Math.floor(Math.random() * suggestions.length);
+      el.textContent = suggestions[idx];
+      container.appendChild(el);
+      addFeedEntry("var(--accent2)", "Suggested: " + suggestions[idx]);
+      document.getElementById("action-badge").textContent = "Suggest";
+      setTimeout(function() { el.remove(); }, 3000);
+      updateStats();
+    },
+
+    // 3. CollapseIdle: fade out widgets not used recently
+    collapseIdle: function(ctx) {
+      totalActions++;
+      var widgets = document.querySelectorAll(".widget");
+      var cutoff = Date.now() - 8000;
+      var collapsed = [];
+      for (var i = 0; i < widgets.length; i++) {
+        var wName = getWidgetName(widgets[i]);
+        var lastTouch = widgetActivity[wName] || 0;
+        if (lastTouch < cutoff && !widgets[i].classList.contains("widget-collapsed")) {
+          widgets[i].classList.add("widget-collapsed");
+          collapsed.push(wName);
+        }
+      }
+      if (collapsed.length > 0) {
+        addFeedEntry("var(--text-dim)", "Collapsed idle: " + collapsed.join(", "));
+      } else {
+        addFeedEntry("var(--text-dim)", "CollapseIdle: all widgets active");
+      }
+      document.getElementById("action-badge").textContent = "Collapse";
+      updateStats();
+    },
+
+    // 4. RefreshFeed: add a status entry to the activity feed
+    refreshFeed: function(ctx) {
+      totalActions++;
+      var eventType = ctx.eventType || "tick";
+      var target = ctx.target ? ctx.target.substring(0, 40) : "page";
+      addFeedEntry("var(--green)", "Brain processed <b>" + eventType + "</b> on " + target);
+      document.getElementById("action-badge").textContent = "Refresh";
+      var feedEl = document.getElementById("widget-feed");
+      feedEl.classList.remove("widget-collapsed");
+      touchWidget("feed");
+      updateStats();
+    },
+
+    // 5. ShowShortcut: display a keyboard shortcut tip near the active widget
+    showShortcut: function(ctx) {
+      totalActions++;
+      var widget = findWidget(ctx.target);
+      if (!widget) widget = document.getElementById("widget-tasks");
+      var wName = getWidgetName(widget);
+      var tip = shortcutMap[wName] || "Interact with this widget";
+      var rect = widget.getBoundingClientRect();
+
+      var tipEl = document.createElement("div");
+      tipEl.className = "shortcut-tip";
+      tipEl.textContent = tip;
+      tipEl.style.top = (rect.top - 40) + "px";
+      tipEl.style.left = (rect.left + rect.width / 2) + "px";
+      tipEl.style.transform = "translateX(-50%)";
+      document.body.appendChild(tipEl);
+
+      addFeedEntry("var(--amber)", "Shortcut tip for <b>" + wName + "</b>: " + tip);
+      document.getElementById("action-badge").textContent = "Shortcut";
+      setTimeout(function() { tipEl.remove(); }, 2500);
+      updateStats();
+    }
+  };
+
+  // ── Task list logic ──
+  function updateTaskCount() {
+    var items = document.querySelectorAll(".task-item");
+    var done = 0;
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].classList.contains("done")) done++;
+    }
+    tasksDone = done;
+    totalTasks = items.length;
+    document.getElementById("task-count").textContent = done + " / " + totalTasks;
+    updateStats();
+  }
+
+  document.getElementById("task-list").addEventListener("click", function(e) {
+    var item = e.target.closest(".task-item");
+    if (!item) return;
+    item.classList.toggle("done");
+    touchWidget("tasks");
+    updateTaskCount();
+  });
+
+  document.getElementById("task-add-btn").addEventListener("click", function() {
+    var input = document.getElementById("task-input");
+    var text = input.value.trim();
+    if (!text) return;
+    var li = document.createElement("li");
+    li.className = "task-item";
+    li.innerHTML = '<div class="task-check"></div><span class="task-label">' + text + '</span>';
+    document.getElementById("task-list").appendChild(li);
+    input.value = "";
+    touchWidget("tasks");
+    updateTaskCount();
+  });
+
+  document.getElementById("task-input").addEventListener("keydown", function(e) {
+    if (e.key === "Enter") document.getElementById("task-add-btn").click();
+  });
+
+  // ── Notes logic ──
+  document.getElementById("notes-area").addEventListener("input", function() {
+    var len = this.value.length;
+    document.getElementById("notes-count").textContent = len + " chars";
+    touchWidget("notes");
+    updateStats();
+  });
+
+  // ── Stat card clicks ──
+  document.querySelectorAll(".stat-card").forEach(function(card) {
+    card.addEventListener("click", function() {
+      touchWidget("stats");
+    });
+  });
+
+  // ── Feed scroll tracking ──
+  document.getElementById("feed-list").addEventListener("scroll", function() {
+    touchWidget("feed");
+  });
+
+  // ── Un-collapse widgets on direct interaction ──
+  document.querySelectorAll(".widget").forEach(function(w) {
+    w.addEventListener("click", function() {
+      w.classList.remove("widget-collapsed");
+      touchWidget(getWidgetName(w));
+    });
+    w.addEventListener("focusin", function() {
+      w.classList.remove("widget-collapsed");
+      touchWidget(getWidgetName(w));
+    });
+  });
+
+  // ── Track all events for stats ──
+  var countableEvents = ["click", "input", "keydown", "focus", "blur", "mousemove", "scroll"];
+  countableEvents.forEach(function(evType) {
+    document.addEventListener(evType, function() {
+      totalEvents++;
+      if (totalEvents % 50 === 0) {
+        document.getElementById("stat-events-trend").textContent = "+50";
+      }
+    }, { passive: true });
+  });
+
+  // ── Initialize widget activity ──
+  var allWidgetNames = ["tasks", "notes", "stats", "feed"];
+  allWidgetNames.forEach(function(n) { widgetActivity[n] = Date.now(); });
+  updateTaskCount();
+
+  // ── BrainWeb App ──
+  var app = BrainWeb.createApp(fx, { seed: 42, debug: true });
+  app.start();
+
+  // ── Recording / Replay Controls ──
+  var recording = false;
+  var lastRecording = null;
+
+  document.getElementById("btn-record").addEventListener("click", function(e) {
+    e.stopPropagation();
+    if (!recording) {
+      app.startRecording();
+      recording = true;
+      this.textContent = "Stop Recording";
+      this.classList.add("recording");
+      document.getElementById("ctrl-status").textContent = "Recording session...";
+      addFeedEntry("var(--red)", "Recording started");
+    } else {
+      lastRecording = app.stopRecording();
+      recording = false;
+      this.textContent = "Record Session";
+      this.classList.remove("recording");
+      document.getElementById("ctrl-status").textContent =
+        "Recorded " + lastRecording.length + " entries. Ready to replay.";
+      addFeedEntry("var(--green)", "Recording stopped: " + lastRecording.length + " entries");
+    }
+  });
+
+  document.getElementById("btn-replay").addEventListener("click", function(e) {
+    e.stopPropagation();
+    if (!lastRecording) {
+      document.getElementById("ctrl-status").textContent = "Nothing recorded yet.";
+      return;
+    }
+    document.getElementById("ctrl-status").textContent =
+      "Replaying " + lastRecording.length + " entries...";
+    addFeedEntry("var(--accent)", "Replaying " + lastRecording.length + " entries...");
+    app.replay(lastRecording);
+    document.getElementById("ctrl-status").textContent = "Replay complete.";
+    addFeedEntry("var(--green)", "Replay finished");
+  });
+
+  document.getElementById("btn-reset").addEventListener("click", function(e) {
+    e.stopPropagation();
+    document.querySelectorAll(".widget").forEach(function(w) {
+      w.classList.remove("widget-collapsed", "widget-glow");
+    });
+    allWidgetNames.forEach(function(n) { widgetActivity[n] = Date.now(); });
+    addFeedEntry("var(--amber)", "All widgets reset");
+  });
+
+})();
+</script>
+
+</body>
+</html>
